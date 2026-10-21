@@ -5,5 +5,8 @@
     <item android:id="@+id/action_reload" android:title="@string/menu_reload" />
     <item android:id="@+id/action_forward" android:title="@string/menu_forward" />
     <item android:id="@+id/action_tabs" android:title="@string/menu_tabs" />
+    <item android:id="@+id/action_media" android:title="@string/menu_media" />
+    <item android:id="@+id/action_vault" android:title="@string/menu_vault" />
+    <item android:id="@+id/action_settings" android:title="@string/menu_settings" />
     <item android:id="@+id/action_wipe_exit" android:title="@string/menu_wipe_exit" />
 </menu>

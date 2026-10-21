@@ -5,6 +5,7 @@ import android.webkit.WebView
 /** Lleva la lista de pestañas abiertas y cuál se está viendo. */
 class TabManager(
     private val createWebView: () -> WebView,
+    private val homeHtml: String,
     private val listener: Listener,
 ) {
 
@@ -26,7 +27,11 @@ class TabManager(
     fun newTab(url: String? = null): Tab {
         val tab = Tab(nextId++, createWebView())
         _tabs.add(tab)
-        if (!url.isNullOrEmpty()) tab.webView.loadUrl(url)
+        if (url.isNullOrEmpty()) {
+            tab.webView.loadDataWithBaseURL(HOME_URL, homeHtml, "text/html", "utf-8", null)
+        } else {
+            tab.webView.loadUrl(url)
+        }
         select(tab)
         listener.onTabsChanged(tabs)
         return tab
@@ -62,6 +67,8 @@ class TabManager(
     }
 
     companion object {
+        const val HOME_URL = "about:blank"
+
         fun destroy(webView: WebView) {
             webView.stopLoading()
             (webView.parent as? android.view.ViewGroup)?.removeView(webView)

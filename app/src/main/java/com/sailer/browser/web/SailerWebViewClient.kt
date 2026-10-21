@@ -19,6 +19,9 @@ class SailerWebViewClient(
         fun onPageStarted(view: WebView, url: String)
         fun onPageFinished(view: WebView, url: String)
         fun onBlocked(view: WebView, reason: BlockReason)
+
+        /** Se llama (en segundo plano) por cada recurso que carga la página. */
+        fun onResourceRequest(view: WebView, request: WebResourceRequest)
     }
 
     enum class BlockReason { INSECURE_HTTP, BAD_CERTIFICATE }
@@ -26,7 +29,9 @@ class SailerWebViewClient(
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val url = request.url.toString()
         return when (request.url.scheme?.lowercase()) {
-            "https", "about", "data", "blob" -> false
+            // Redirecciones a webs de publicidad (pop-unders): bloqueadas.
+            "https" -> requestFilter.shouldBlockNavigation(request.url)
+            "about", "data", "blob" -> false
             "http" -> {
                 // Forzar HTTPS: reintentar la misma dirección de forma segura.
                 if (request.isForMainFrame) view.loadUrl(UrlUtils.upgradeToHttps(url))
@@ -38,7 +43,10 @@ class SailerWebViewClient(
     }
 
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-        if (!requestFilter.shouldBlock(request)) return null
+        if (!requestFilter.shouldBlock(request)) {
+            callbacks.onResourceRequest(view, request)
+            return null
+        }
         return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
     }
 

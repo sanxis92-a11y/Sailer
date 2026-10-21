@@ -9,12 +9,79 @@
     <string name="menu_reload">Recargar</string>
     <string name="menu_forward">Adelante</string>
     <string name="menu_tabs">Ver pestañas</string>
+    <string name="menu_media">Descargar vídeo/audio de esta página</string>
+    <string name="menu_vault">Carpeta segura</string>
+    <string name="menu_settings">Ajustes</string>
     <string name="menu_wipe_exit">Borrar todo y salir</string>
     <string name="tabs_title">Pestañas</string>
     <string name="new_tab_title">Nueva pestaña</string>
     <string name="close">Cerrar</string>
     <string name="http_blocked">Bloqueado: esta web no usa conexión segura (HTTPS).</string>
     <string name="ssl_error">Bloqueado: el certificado de seguridad de esta web no es válido.</string>
-    <string name="downloads_soon">Las descargas llegarán en una próxima versión.</string>
     <string name="wiped">Todo borrado</string>
+
+    <!-- Descargas -->
+    <string name="media_title">Medios encontrados</string>
+    <string name="media_none">No he encontrado vídeos ni audios en esta página.\n\nConsejo: dale al play primero y espera unos segundos; luego vuelve a pulsar el botón de descarga.\n\nPara guardar una imagen, mantén el dedo pulsado sobre ella.</string>
+    <string name="media_hls">🎬 Vídeo (streaming)</string>
+    <string name="media_video">🎬 Vídeo</string>
+    <string name="media_audio">🎵 Audio</string>
+    <string name="media_image">🖼️ Imagen</string>
+    <string name="media_file">📄 Archivo</string>
+    <string name="download_image">Descargar imagen</string>
+    <string name="download_link">Descargar enlace</string>
+    <string name="open_new_tab">Abrir en pestaña nueva</string>
+    <string name="download_started">Descargando en la carpeta segura…</string>
+    <string name="downloads_channel">Descargas</string>
+    <string name="downloads_running">Descargando %d archivo(s)</string>
+
+    <!-- Carpeta segura -->
+    <string name="vault_subtitle">Cifrada y oculta de la galería</string>
+    <string name="vault_empty">Aquí aparecerán tus descargas.\n\nTodo se guarda cifrado: ni la galería ni otras apps pueden verlo.</string>
+    <string name="vault_queued">En cola…</string>
+    <string name="vault_downloading">Descargando…</string>
+    <string name="vault_progress">Descargando… %d%%</string>
+    <string name="vault_failed">Error: %s</string>
+    <string name="vault_retry">Reintentar</string>
+    <string name="vault_remove">Quitar</string>
+    <string name="vault_cancel_download">Cancelar descarga</string>
+    <string name="vault_rename">Renombrar</string>
+    <string name="vault_export">Exportar</string>
+    <string name="vault_export_warning">El archivo se guardará SIN cifrar en la carpeta que elijas, y podría verse desde la galería u otras apps.</string>
+    <string name="vault_exported">Exportado</string>
+    <string name="vault_export_failed">No se pudo exportar</string>
+    <string name="vault_delete">Borrar</string>
+    <string name="vault_delete_confirm">¿Borrar «%s» para siempre?</string>
+    <string name="viewer_error">No se puede abrir este archivo</string>
+
+    <!-- Bloqueo -->
+    <string name="lock_title">Sailer está bloqueado</string>
+    <string name="lock_hint">PIN</string>
+    <string name="lock_unlock">Desbloquear</string>
+    <string name="lock_use_biometric">Usar huella</string>
+    <string name="lock_use_pin">Usar PIN</string>
+    <string name="lock_biometric_title">Desbloquear Sailer</string>
+    <string name="lock_wrong_pin">PIN incorrecto</string>
+    <string name="lock_wait">Demasiados intentos. Espera 30 segundos.</string>
+
+    <!-- Ajustes -->
+    <string name="settings_section_privacy">Privacidad</string>
+    <string name="settings_adblock">Bloquear anuncios, rastreadores y pop-ups</string>
+    <string name="settings_adblock_help">Usa una lista de más de 70.000 dominios de publicidad y rastreo.</string>
+    <string name="settings_doh">DNS cifrado en las descargas</string>
+    <string name="settings_doh_help">Las descargas consultan las direcciones de forma cifrada (Cloudflare 1.1.1.1), así tu operadora no ve qué webs visitas.</string>
+    <string name="settings_private_dns">DNS cifrado para todo el móvil</string>
+    <string name="settings_private_dns_help">Las páginas web usan las DNS del sistema. Para cifrarlas en todo el móvil:\n\n1. Abre Ajustes → Redes e Internet (o Conexiones) → DNS privado.\n2. Elige «Nombre del proveedor de DNS privado».\n3. Escribe: dns.adguard-dns.com (cifra y además bloquea anuncios) o one.one.one.one\n4. Guarda.</string>
+    <string name="settings_open_settings">Abrir ajustes</string>
+    <string name="settings_section_lock">Bloqueo</string>
+    <string name="settings_lock">Pedir PIN al abrir Sailer</string>
+    <string name="settings_biometric">Permitir desbloquear con huella</string>
+    <string name="settings_change_pin">Cambiar PIN</string>
+    <string name="settings_pin_title">Elige un PIN</string>
+    <string name="settings_pin_new">PIN (mínimo 4 números)</string>
+    <string name="settings_pin_repeat">Repite el PIN</string>
+    <string name="settings_pin_short">El PIN debe tener al menos 4 números</string>
+    <string name="settings_pin_mismatch">Los PIN no coinciden</string>
+    <string name="settings_pin_saved">PIN guardado</string>
+    <string name="settings_version">Sailer %s</string>
 </resources>

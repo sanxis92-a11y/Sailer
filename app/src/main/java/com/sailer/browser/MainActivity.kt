@@ -1,11 +1,16 @@
 package com.sailer.browser
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.os.Build
 import android.os.Bundle
+import android.webkit.URLUtil
+import android.webkit.WebResourceRequest
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.webkit.WebChromeClient
@@ -14,24 +19,35 @@ import android.widget.FrameLayout
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.databinding.ActivityMainBinding
+import com.sailer.browser.download.DownloadCenter
+import com.sailer.browser.download.DownloadRequest
+import com.sailer.browser.lock.SecureActivity
+import com.sailer.browser.media.DetectedMedia
+import com.sailer.browser.media.MediaKind
+import com.sailer.browser.media.MediaSniffer
 import com.sailer.browser.privacy.PrivacyManager
+import com.sailer.browser.settings.Prefs
+import com.sailer.browser.settings.SettingsActivity
 import com.sailer.browser.tabs.Tab
 import com.sailer.browser.tabs.TabManager
 import com.sailer.browser.web.BrowserWebViewFactory
 import com.sailer.browser.web.DownloadHandler
-import com.sailer.browser.web.RequestFilter
 import com.sailer.browser.web.SailerChromeClient
 import com.sailer.browser.web.SailerWebViewClient
 import com.sailer.browser.web.UrlUtils
+import com.sailer.browser.vault.VaultActivity
+import org.json.JSONArray
+import org.json.JSONTokener
 
-class MainActivity : AppCompatActivity(),
+class MainActivity : SecureActivity(),
     TabManager.Listener,
     SailerWebViewClient.Callbacks,
     SailerChromeClient.Callbacks {
@@ -44,24 +60,30 @@ class MainActivity : AppCompatActivity(),
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
 
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Impide capturas de pantalla, grabaciones y la vista previa en "recientes".
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         webViewFactory = BrowserWebViewFactory(
             context = this,
-            requestFilter = RequestFilter.ALLOW_ALL,
-            downloadHandler = DownloadHandler.notYetAvailable(this),
+            requestFilter = AdBlocker,
+            downloadHandler = DownloadHandler { url, _, contentDisposition, mimeType, _ ->
+                val name = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                startDownload(url, MediaSniffer.kindForMime(mimeType) ?: MediaKind.FILE, mimeType, name)
+            },
         )
-        tabManager = TabManager({ webViewFactory.create(this, chromeClient) }, this)
+        val homeHtml = assets.open("home.html").bufferedReader().use { it.readText() }
+        tabManager = TabManager({ createWebView() }, homeHtml, this)
 
         setUpAddressBar()
         binding.tabCount.setOnClickListener { showTabs() }
         binding.menuButton.setOnClickListener { showMenu(it) }
+        binding.mediaButton.setOnClickListener { showMedia() }
         onBackPressedDispatcher.addCallback(this, backCallback)
 
         val startUrl = intentUrl(intent)
@@ -76,6 +98,7 @@ class MainActivity : AppCompatActivity(),
 
     override fun onResume() {
         super.onResume()
+        AdBlocker.enabled = Prefs.get(this).adBlockEnabled
         tabManager.current?.webView?.onResume()
     }
 
@@ -150,6 +173,9 @@ class MainActivity : AppCompatActivity(),
                     R.id.action_reload -> tabManager.current?.webView?.reload()
                     R.id.action_forward -> tabManager.current?.webView?.goForward()
                     R.id.action_tabs -> showTabs()
+                    R.id.action_media -> showMedia()
+                    R.id.action_vault -> startActivity(Intent(this@MainActivity, VaultActivity::class.java))
+                    R.id.action_settings -> startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
                     R.id.action_wipe_exit -> wipeAndExit()
                 }
                 true
@@ -212,6 +238,7 @@ class MainActivity : AppCompatActivity(),
         }
         showUrl(tab)
         updateProgress(tab)
+        updateMediaButton()
     }
 
     override fun onTabsChanged(tabs: List<Tab>) {
@@ -222,7 +249,9 @@ class MainActivity : AppCompatActivity(),
 
     override fun onPageStarted(view: WebView, url: String) {
         val tab = tabManager.findByWebView(view) ?: return
+        if (tab.url != url) tab.media.clear()
         tab.url = url
+        if (tab === tabManager.current) updateMediaButton()
         if (tab === tabManager.current) showUrl(tab)
     }
 
@@ -239,6 +268,12 @@ class MainActivity : AppCompatActivity(),
             SailerWebViewClient.BlockReason.BAD_CERTIFICATE -> R.string.ssl_error
         }
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    override fun onResourceRequest(view: WebView, request: WebResourceRequest) {
+        val url = request.url.toString()
+        val kind = MediaSniffer.classify(url) ?: return
+        runOnUiThread { addMedia(view, DetectedMedia(url, kind)) }
     }
 
     // ---- SailerChromeClient.Callbacks ----
@@ -278,6 +313,127 @@ class MainActivity : AppCompatActivity(),
         fullscreenCallback?.onCustomViewHidden()
         fullscreenView = null
         fullscreenCallback = null
+    }
+
+    // ---- Descargas ----
+
+    private fun createWebView(): WebView {
+        val webView = webViewFactory.create(this, chromeClient)
+        webView.setOnLongClickListener { onLongPress(webView) }
+        return webView
+    }
+
+    private fun addMedia(view: WebView, media: DetectedMedia) {
+        val tab = tabManager.findByWebView(view) ?: return
+        // Si ya hay una lista HLS, no hace falta listar también sus trozos.
+        if (tab.media.containsKey(media.url)) return
+        tab.media[media.url] = media
+        if (tab === tabManager.current) updateMediaButton()
+    }
+
+    private fun updateMediaButton() {
+        val hasMedia = tabManager.current?.media?.isNotEmpty() == true
+        val color = ContextCompat.getColor(this, if (hasMedia) R.color.accent else R.color.text_dim)
+        binding.mediaButton.imageTintList = ColorStateList.valueOf(color)
+    }
+
+    /** Busca vídeos/audios en la página y muestra la lista para descargar. */
+    private fun showMedia() {
+        val tab = tabManager.current ?: return
+        tab.webView.evaluateJavascript(MediaSniffer.SCAN_SCRIPT) { result ->
+            runCatching {
+                val json = JSONTokener(result).nextValue() as? String ?: return@runCatching
+                val array = JSONArray(json)
+                for (i in 0 until array.length()) {
+                    val url = array.getString(i)
+                    if (!url.startsWith("https://")) continue
+                    val kind = MediaSniffer.classify(url) ?: MediaKind.VIDEO
+                    addMedia(tab.webView, DetectedMedia(url, kind))
+                }
+            }
+            showMediaDialog(tab)
+        }
+    }
+
+    private fun showMediaDialog(tab: Tab) {
+        val items = tab.media.values.toList().sortedBy { if (it.kind == MediaKind.HLS) 0 else 1 }
+        if (items.isEmpty()) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.media_title)
+                .setMessage(R.string.media_none)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+        val labels = items.map { media ->
+            val type = when (media.kind) {
+                MediaKind.HLS -> getString(R.string.media_hls)
+                MediaKind.VIDEO -> getString(R.string.media_video)
+                MediaKind.AUDIO -> getString(R.string.media_audio)
+                MediaKind.IMAGE -> getString(R.string.media_image)
+                MediaKind.FILE -> getString(R.string.media_file)
+            }
+            val uri = android.net.Uri.parse(media.url)
+            "$type\n${uri.host}/…${uri.lastPathSegment.orEmpty().takeLast(40)}"
+        }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.media_title)
+            .setItems(labels) { _, which -> startDownload(items[which].url, items[which].kind) }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun onLongPress(webView: WebView): Boolean {
+        val hit = webView.hitTestResult
+        val url = hit.extra ?: return false
+        return when (hit.type) {
+            WebView.HitTestResult.IMAGE_TYPE, WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.media_image)
+                    .setItems(arrayOf(getString(R.string.download_image), getString(R.string.open_new_tab))) { _, which ->
+                        if (which == 0) startDownload(url, MediaKind.IMAGE) else tabManager.newTab(UrlUtils.fromUserInput(url))
+                    }
+                    .show()
+                true
+            }
+            WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(url.take(120))
+                    .setItems(arrayOf(getString(R.string.open_new_tab), getString(R.string.download_link))) { _, which ->
+                        if (which == 0) {
+                            tabManager.newTab(UrlUtils.fromUserInput(url))
+                        } else {
+                            startDownload(url, MediaSniffer.classify(url) ?: MediaKind.FILE)
+                        }
+                    }
+                    .show()
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun startDownload(url: String, kind: MediaKind, mimeType: String? = null, fileName: String? = null) {
+        val tab = tabManager.current
+        val secureUrl = if (url.startsWith("data:")) url else UrlUtils.upgradeToHttps(url)
+        DownloadCenter.enqueue(
+            DownloadRequest(
+                url = secureUrl,
+                title = tab?.title?.ifBlank { null } ?: getString(R.string.app_name),
+                kind = kind,
+                referer = tab?.url,
+                userAgent = tab?.webView?.settings?.userAgentString ?: "",
+                mimeType = mimeType,
+                fileName = fileName,
+            )
+        )
+        // Para que la descarga siga con la app cerrada, Android 13+ pide permiso de notificaciones.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show()
     }
 
     // ---- Utilidades ----

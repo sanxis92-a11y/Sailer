@@ -11,8 +11,8 @@ android {
         applicationId = "com.sailer.browser"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "1.0.0"
     }
 
     signingConfigs {
@@ -32,7 +32,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
+            // Misma clave para poder instalar encima de versiones anteriores.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -49,6 +52,10 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
+    }
+    lint {
+        checkReleaseBuilds = false
     }
 }
 
@@ -58,4 +65,11 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.3")
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
 }

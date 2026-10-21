@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,12 +21,28 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Compilar APK de prueba (debug)
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Compilar APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Poner nombre al APK
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cp app/build/outputs/apk/release/app-release.apk "Sailer-$VERSION.apk"
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
           name: Sailer-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: Sailer-*.apk
           retention-days: 30
+
+      # En la rama principal, publicar también una "Release" para descargarla fácil.
+      - name: Publicar release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}-${{ github.run_number }}
+          name: Sailer ${{ env.VERSION }} (compilación ${{ github.run_number }})
+          files: Sailer-*.apk
+          make_latest: true
