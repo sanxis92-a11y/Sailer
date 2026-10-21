@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
+import android.text.format.Formatter
+import android.view.WindowManager
 import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
 import android.view.KeyEvent
@@ -24,7 +26,16 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.sailer.browser.adblock.CosmeticFilter
+import com.sailer.browser.databinding.ItemMediaBinding
+import com.sailer.browser.databinding.SheetMediaBinding
+import com.sailer.browser.media.MediaElementInfo
+import com.sailer.browser.media.MediaInspector
+import com.sailer.browser.media.MediaOption
+import com.sailer.browser.media.PageMediaInfo
 import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.databinding.ActivityMainBinding
 import com.sailer.browser.download.DownloadCenter
@@ -45,7 +56,11 @@ import com.sailer.browser.web.SailerWebViewClient
 import com.sailer.browser.web.UrlUtils
 import com.sailer.browser.vault.VaultActivity
 import org.json.JSONArray
+import org.json.JSONObject
 import org.json.JSONTokener
+import kotlinx.coroutines.launch
+import java.util.Locale
+import kotlin.concurrent.thread
 
 class MainActivity : SecureActivity(),
     TabManager.Listener,
@@ -55,7 +70,7 @@ class MainActivity : SecureActivity(),
     private lateinit var binding: ActivityMainBinding
     private lateinit var tabManager: TabManager
     private lateinit var webViewFactory: BrowserWebViewFactory
-    private val chromeClient by lazy { SailerChromeClient(this) }
+    private val chromeClient by lazy { SailerChromeClient(AdBlocker, this) }
 
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
@@ -166,6 +181,14 @@ class MainActivity : SecureActivity(),
         PopupMenu(this, anchor).apply {
             menuInflater.inflate(R.menu.main_menu, menu)
             menu.findItem(R.id.action_forward).isEnabled = tabManager.current?.webView?.canGoForward() == true
+            val client = tabManager.current?.webView?.webViewClient as? SailerWebViewClient
+            val siteItem = menu.findItem(R.id.action_adblock_site)
+            siteItem.isVisible = AdBlocker.enabled && client?.pageHost != null
+            siteItem.title = if (AdBlocker.isAllowedSite(client?.pageHost)) {
+                getString(R.string.adblock_site_on)
+            } else {
+                getString(R.string.adblock_site_off, client?.blockedCount?.get() ?: 0)
+            }
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.action_new_tab -> { tabManager.newTab(); focusAddressBar() }
@@ -173,6 +196,7 @@ class MainActivity : SecureActivity(),
                     R.id.action_reload -> tabManager.current?.webView?.reload()
                     R.id.action_forward -> tabManager.current?.webView?.goForward()
                     R.id.action_tabs -> showTabs()
+                    R.id.action_adblock_site -> toggleAdBlockForSite()
                     R.id.action_media -> showMedia()
                     R.id.action_vault -> startActivity(Intent(this@MainActivity, VaultActivity::class.java))
                     R.id.action_settings -> startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
@@ -196,6 +220,14 @@ class MainActivity : SecureActivity(),
             .setPositiveButton(R.string.menu_new_tab) { _, _ -> tabManager.newTab(); focusAddressBar() }
             .setNegativeButton(R.string.close, null)
             .show()
+    }
+
+    private fun toggleAdBlockForSite() {
+        val webView = tabManager.current?.webView ?: return
+        val host = (webView.webViewClient as? SailerWebViewClient)?.pageHost ?: return
+        AdBlocker.setAllowedSite(this, host, !AdBlocker.isAllowedSite(host))
+        thread { CosmeticFilter.rebuildScript() }
+        webView.reload()
     }
 
     private fun closeCurrentTab() {
@@ -256,6 +288,7 @@ class MainActivity : SecureActivity(),
     }
 
     override fun onPageFinished(view: WebView, url: String) {
+        CosmeticFilter.applyLate(view)
         val tab = tabManager.findByWebView(view) ?: return
         tab.url = url
         if (tab === tabManager.current) showUrl(tab)
@@ -282,6 +315,21 @@ class MainActivity : SecureActivity(),
         val tab = tabManager.findByWebView(view) ?: return
         tab.progress = progress
         if (tab === tabManager.current) updateProgress(tab)
+    }
+
+    override fun onOpenInNewTab(url: String) {
+        tabManager.newTab(url)
+    }
+
+    private var lastPopupToast = 0L
+
+    override fun onPopupBlocked(view: WebView) {
+        (view.webViewClient as? SailerWebViewClient)?.blockedCount?.incrementAndGet()
+        val now = System.currentTimeMillis()
+        if (view === tabManager.current?.webView && now - lastPopupToast > 4000) {
+            lastPopupToast = now
+            Toast.makeText(this, R.string.popup_blocked, Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onTitle(view: WebView, title: String) {
@@ -337,50 +385,124 @@ class MainActivity : SecureActivity(),
         binding.mediaButton.imageTintList = ColorStateList.valueOf(color)
     }
 
-    /** Busca vídeos/audios en la página y muestra la lista para descargar. */
+    /** Busca vídeos/audios en la página y muestra una lista clara para elegir. */
     private fun showMedia() {
         val tab = tabManager.current ?: return
         tab.webView.evaluateJavascript(MediaSniffer.SCAN_SCRIPT) { result ->
-            runCatching {
-                val json = JSONTokener(result).nextValue() as? String ?: return@runCatching
-                val array = JSONArray(json)
-                for (i in 0 until array.length()) {
-                    val url = array.getString(i)
-                    if (!url.startsWith("https://")) continue
-                    val kind = MediaSniffer.classify(url) ?: MediaKind.VIDEO
-                    addMedia(tab.webView, DetectedMedia(url, kind))
+            val info = parsePageInfo(result) ?: PageMediaInfo(tab.title, "", emptyList())
+            info.elements.forEach { element ->
+                if (element.src.startsWith("https://")) {
+                    val kind = MediaSniffer.classify(element.src)
+                        ?: if (element.isAudio) MediaKind.AUDIO else MediaKind.VIDEO
+                    addMedia(tab.webView, DetectedMedia(element.src, kind))
                 }
             }
-            showMediaDialog(tab)
+            showMediaSheet(tab, info)
         }
     }
 
-    private fun showMediaDialog(tab: Tab) {
-        val items = tab.media.values.toList().sortedBy { if (it.kind == MediaKind.HLS) 0 else 1 }
-        if (items.isEmpty()) {
-            MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.media_title)
-                .setMessage(R.string.media_none)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
+    private fun parsePageInfo(result: String?): PageMediaInfo? = runCatching {
+        val json = JSONObject(JSONTokener(result).nextValue() as String)
+        val items = json.optJSONArray("items") ?: JSONArray()
+        val elements = (0 until items.length()).map { i ->
+            val o = items.getJSONObject(i)
+            MediaElementInfo(
+                src = o.optString("src"),
+                width = o.optInt("w"),
+                height = o.optInt("h"),
+                duration = o.optDouble("d", 0.0).takeIf { !it.isNaN() } ?: 0.0,
+                poster = o.optString("poster"),
+                isAudio = o.optBoolean("audio"),
+            )
+        }
+        PageMediaInfo(json.optString("title"), json.optString("image"), elements)
+    }.getOrNull()
+
+    private fun showMediaSheet(tab: Tab, info: PageMediaInfo) {
+        val sheet = BottomSheetDialog(this)
+        sheet.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val view = SheetMediaBinding.inflate(layoutInflater)
+        sheet.setContentView(view.root)
+        val pageTitle = info.title.ifBlank { tab.title }.ifBlank { UrlUtils.forDisplay(tab.url) }
+        view.pageTitle.text = pageTitle
+        sheet.show()
+
+        val detected = tab.media.values.toList()
+        if (detected.isEmpty()) {
+            view.loading.visibility = View.GONE
+            view.empty.visibility = View.VISIBLE
             return
         }
-        val labels = items.map { media ->
-            val type = when (media.kind) {
-                MediaKind.HLS -> getString(R.string.media_hls)
-                MediaKind.VIDEO -> getString(R.string.media_video)
-                MediaKind.AUDIO -> getString(R.string.media_audio)
-                MediaKind.IMAGE -> getString(R.string.media_image)
-                MediaKind.FILE -> getString(R.string.media_file)
+        val userAgent = tab.webView.settings.userAgentString
+        val referer = tab.url
+        val inspector = MediaInspector(this)
+        val job = lifecycleScope.launch {
+            val thumbUrl = info.elements.firstOrNull { it.poster.isNotBlank() }?.poster ?: info.image
+            launch {
+                if (thumbUrl.isNotBlank()) {
+                    inspector.loadThumbnail(thumbUrl, referer, userAgent)?.let { view.thumbnail.setImageBitmap(it) }
+                }
             }
-            val uri = android.net.Uri.parse(media.url)
-            "$type\n${uri.host}/…${uri.lastPathSegment.orEmpty().takeLast(40)}"
-        }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.media_title)
-            .setItems(labels) { _, which -> startDownload(items[which].url, items[which].kind) }
-            .setNegativeButton(R.string.close, null)
-            .show()
+            val options = inspector.inspect(detected, info.elements, referer, userAgent)
+            view.loading.visibility = View.GONE
+            if (options.isEmpty()) view.empty.visibility = View.VISIBLE
+            var bestMarked = false
+            options.forEach { option ->
+                val isBest = !bestMarked && !option.drm && !option.isAudio && !option.looksLikePreview
+                if (isBest) bestMarked = true
+                view.options.addView(mediaRow(view, option, isBest, pageTitle) { sheet.dismiss() })
+            }
+        }
+        sheet.setOnDismissListener { job.cancel() }
+    }
+
+    private fun mediaRow(
+        sheet: SheetMediaBinding,
+        option: MediaOption,
+        isBest: Boolean,
+        pageTitle: String,
+        onChosen: () -> Unit,
+    ): View {
+        val row = ItemMediaBinding.inflate(layoutInflater, sheet.options, false)
+        row.icon.text = if (option.isAudio) "🎵" else "🎬"
+        val type = getString(if (option.isAudio) R.string.media_audio else R.string.media_video)
+        row.title.text = listOfNotNull(type, option.qualityLabel).joinToString(" · ")
+        val size = when {
+            option.sizeBytes > 0 -> (if (option.sizeIsEstimate) "≈ " else "") +
+                Formatter.formatShortFileSize(this, option.sizeBytes)
+            else -> getString(R.string.media_unknown_size)
+        }
+        row.details.text = listOfNotNull(
+            option.format,
+            size,
+            option.durationSec.takeIf { it >= 1 }?.let { formatDuration(it) },
+            option.host.takeIf { it.isNotEmpty() },
+        ).joinToString(" · ")
+        val (note, color) = when {
+            option.drm -> getString(R.string.media_drm) to R.color.text_dim
+            isBest -> getString(R.string.media_best) to R.color.accent
+            option.looksLikePreview -> getString(R.string.media_preview) to R.color.text_dim
+            else -> null to R.color.text_dim
+        }
+        if (note != null) {
+            row.note.visibility = View.VISIBLE
+            row.note.text = note
+            row.note.setTextColor(ContextCompat.getColor(this, color))
+        }
+        row.download.isEnabled = !option.drm
+        row.download.setOnClickListener {
+            startDownload(option.url, option.kind, titleSuffix = option.qualityLabel)
+            onChosen()
+        }
+        return row.root
+    }
+
+    private fun formatDuration(seconds: Double): String {
+        val total = seconds.toLong()
+        val h = total / 3600
+        val m = (total % 3600) / 60
+        val s = total % 60
+        return if (h > 0) String.format(Locale.ROOT, "%d:%02d:%02d", h, m, s) else String.format(Locale.ROOT, "%d:%02d", m, s)
     }
 
     private fun onLongPress(webView: WebView): Boolean {
@@ -413,13 +535,20 @@ class MainActivity : SecureActivity(),
         }
     }
 
-    private fun startDownload(url: String, kind: MediaKind, mimeType: String? = null, fileName: String? = null) {
+    private fun startDownload(
+        url: String,
+        kind: MediaKind,
+        mimeType: String? = null,
+        fileName: String? = null,
+        titleSuffix: String? = null,
+    ) {
         val tab = tabManager.current
+        val baseTitle = tab?.title?.ifBlank { null } ?: getString(R.string.app_name)
         val secureUrl = if (url.startsWith("data:")) url else UrlUtils.upgradeToHttps(url)
         DownloadCenter.enqueue(
             DownloadRequest(
                 url = secureUrl,
-                title = tab?.title?.ifBlank { null } ?: getString(R.string.app_name),
+                title = if (titleSuffix != null) "$baseTitle ($titleSuffix)" else baseTitle,
                 kind = kind,
                 referer = tab?.url,
                 userAgent = tab?.webView?.settings?.userAgentString ?: "",

@@ -23,11 +23,19 @@
     <!-- Descargas -->
     <string name="media_title">Medios encontrados</string>
     <string name="media_none">No he encontrado vídeos ni audios en esta página.\n\nConsejo: dale al play primero y espera unos segundos; luego vuelve a pulsar el botón de descarga.\n\nPara guardar una imagen, mantén el dedo pulsado sobre ella.</string>
-    <string name="media_hls">🎬 Vídeo (streaming)</string>
-    <string name="media_video">🎬 Vídeo</string>
-    <string name="media_audio">🎵 Audio</string>
+    <string name="media_choose">Elige qué quieres descargar</string>
+    <string name="media_analyzing">Mirando calidades y tamaños…</string>
+    <string name="media_download">Bajar</string>
+    <string name="media_video">Vídeo</string>
+    <string name="media_audio">Audio</string>
     <string name="media_image">🖼️ Imagen</string>
-    <string name="media_file">📄 Archivo</string>
+    <string name="media_best">⭐ Mejor calidad: probablemente es el vídeo principal</string>
+    <string name="media_preview">Vídeo corto: seguramente una vista previa o un anuncio</string>
+    <string name="media_drm">🔒 Protegido con DRM: no se puede descargar</string>
+    <string name="media_unknown_size">tamaño desconocido</string>
+    <string name="popup_blocked">Ventana emergente bloqueada</string>
+    <string name="adblock_site_off">🛡️ %d bloqueados · Desactivar en esta web</string>
+    <string name="adblock_site_on">🛡️ Activar bloqueador en esta web</string>
     <string name="download_image">Descargar imagen</string>
     <string name="download_link">Descargar enlace</string>
     <string name="open_new_tab">Abrir en pestaña nueva</string>

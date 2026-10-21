@@ -7,6 +7,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import com.sailer.browser.adblock.CosmeticFilter
 
 /** Crea WebViews con una configuración pensada para la privacidad. */
 class BrowserWebViewFactory(
@@ -30,8 +31,9 @@ class BrowserWebViewFactory(
             setGeolocationEnabled(false)
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             safeBrowsingEnabled = false
-            // Sin ventanas emergentes: window.open() no abre ventanas nuevas.
-            setSupportMultipleWindows(false)
+            // Las ventanas nuevas pasan por SailerChromeClient.onCreateWindow,
+            // que solo deja abrir enlaces tocados de verdad. Sin pop-ups automáticos.
+            setSupportMultipleWindows(true)
             javaScriptCanOpenWindowsAutomatically = false
             mediaPlaybackRequiresUserGesture = true
             builtInZoomControls = true
@@ -51,6 +53,7 @@ class BrowserWebViewFactory(
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false)
 
         webView.webViewClient = SailerWebViewClient(requestFilter, callbacks)
+        CosmeticFilter.install(webView)
         webView.webChromeClient = chromeClient
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
             downloadHandler.onDownloadRequested(url, userAgent, contentDisposition, mimeType, contentLength)

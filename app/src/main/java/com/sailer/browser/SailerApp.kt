@@ -5,6 +5,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.sailer.browser.adblock.AdBlocker
+import com.sailer.browser.adblock.CosmeticFilter
 import com.sailer.browser.download.DownloadCenter
 import com.sailer.browser.lock.AppLock
 import com.sailer.browser.privacy.PrivacyManager
@@ -20,6 +21,7 @@ class SailerApp : Application() {
 
         AdBlocker.enabled = Prefs.get(this).adBlockEnabled
         AdBlocker.load(this)
+        CosmeticFilter.load(this)
         DownloadCenter.init(this)
 
         // Bloquear al abrir y cada vez que la app pasa a segundo plano.

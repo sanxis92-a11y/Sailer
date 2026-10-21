@@ -49,18 +49,46 @@ object MediaSniffer {
         else -> null
     }
 
-    /** JavaScript que lista los vídeos y audios presentes en la página. */
+    /**
+     * JavaScript que describe la página: título, imagen de portada y cada
+     * vídeo/audio con su resolución, duración y miniatura.
+     */
     const val SCAN_SCRIPT = """
         (function() {
-          var r = [];
-          document.querySelectorAll('video, audio, video source, audio source').forEach(function(e) {
-            var s = e.currentSrc || e.src;
-            if (s) r.push(s);
+          function meta(p) { var m = document.querySelector('meta[property="' + p + '"]'); return m ? m.content : ''; }
+          var items = [];
+          document.querySelectorAll('video, audio').forEach(function(e) {
+            var srcs = [];
+            if (e.currentSrc) srcs.push(e.currentSrc);
+            if (e.src) srcs.push(e.src);
+            e.querySelectorAll('source').forEach(function(s) { if (s.src) srcs.push(s.src); });
+            if (srcs.length === 0) srcs.push('');
+            srcs.forEach(function(s) {
+              items.push({ src: s, w: e.videoWidth || 0, h: e.videoHeight || 0,
+                d: isFinite(e.duration) ? e.duration : 0, poster: e.poster || '', audio: e.tagName === 'AUDIO' });
+            });
           });
-          document.querySelectorAll('meta[property="og:video"], meta[property="og:video:url"], meta[property="og:video:secure_url"]').forEach(function(m) {
-            if (m.content) r.push(m.content);
+          ['og:video', 'og:video:url', 'og:video:secure_url'].forEach(function(p) {
+            var v = meta(p);
+            if (v) items.push({ src: v, w: 0, h: 0, d: 0, poster: '', audio: false });
           });
-          return JSON.stringify(r);
+          return JSON.stringify({ title: document.title, image: meta('og:image'), items: items });
         })();
     """
 }
+
+/** Un vídeo/audio tal como lo ve la página (resolución, duración, miniatura). */
+data class MediaElementInfo(
+    val src: String,
+    val width: Int,
+    val height: Int,
+    val duration: Double,
+    val poster: String,
+    val isAudio: Boolean,
+)
+
+data class PageMediaInfo(
+    val title: String,
+    val image: String,
+    val elements: List<MediaElementInfo>,
+)

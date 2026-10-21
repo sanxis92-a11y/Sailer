@@ -2,19 +2,22 @@
 
 Navegador Android personal, ligero y centrado en la privacidad, con descargador de vídeo, imágenes y audio.
 
-## Qué hace (versión 1.0)
+## Qué hace (versión 1.1)
 
 **Privacidad**
 - **Incógnito siempre**: al salir se borran cookies, caché, historial, formularios y almacenamiento de las webs. Si la app se cierra de golpe, se borra al volver a abrirla.
 - **Solo HTTPS**: las direcciones `http://` pasan a `https://`; las conexiones sin cifrar o con certificados falsos se bloquean.
 - **Sin capturas**: no se pueden hacer capturas ni grabaciones, y en "apps recientes" la vista previa sale en negro.
-- **Bloqueador** de anuncios, rastreadores, pop-ups y redirecciones de publicidad (lista de ~70.000 dominios).
+- **Bloqueador** de anuncios, rastreadores y redirecciones de publicidad: ~250.000 dominios (StevenBlack, HaGeZi PRO++, EasyList, EasyList Adult, EasyPrivacy).
+- **Bloqueo cosmético**: oculta los huecos y banners de anuncios dentro de las páginas (reglas de EasyList y EasyList Adult).
+- **Pop-ups**: solo se abre una pestaña nueva si tocas un enlace que lleva justo ahí; la publicidad que se abre al tocar en cualquier sitio se descarta.
+- Si una web no funciona bien, puedes desactivar el bloqueador solo en esa web desde el menú ⋮.
 - **Bloqueo con PIN o huella** al abrir la app y cada vez que vuelves a ella.
 - **DNS cifrado** (DNS over HTTPS) en las descargas, y guía para activar el DNS privado de Android para todo el móvil.
 - Sin ubicación, cámara ni micrófono para las webs, sin copias de seguridad en la nube y sin enviar datos a Google.
 
 **Descargas**
-- Botón de descarga (flecha ⬇️ arriba): lista los vídeos y audios de la página, incluidos los vídeos en streaming **HLS (.m3u8)**. Elige la mejor calidad automáticamente.
+- Botón de descarga (flecha ⬇️ arriba): muestra la portada de la página y cada vídeo/audio con su **calidad** (720p, 1080p…), **tamaño**, **duración** y formato, marcando el que probablemente es el vídeo principal y avisando de las vistas previas cortas. Los vídeos en streaming **HLS (.m3u8)** aparecen con cada calidad disponible.
 - Mantén pulsada una **imagen** o un **enlace** para descargarlo.
 - Los vídeos con **DRM** (Netflix, etc.) no se pueden descargar.
 - Todo se guarda en la **carpeta segura**: cifrada (AES-256) y oculta de la galería. Desde ahí puedes ver, renombrar, borrar o exportar.
@@ -53,4 +56,4 @@ app/src/main/java/com/sailer/browser/
 └── web/                   Configuración privada de WebView
 ```
 
-La lista de bloqueo procede de [StevenBlack/hosts](https://github.com/StevenBlack/hosts) (licencia MIT).
+Las listas de bloqueo se generan con `python3 tools/build_blocklists.py` a partir de [StevenBlack/hosts](https://github.com/StevenBlack/hosts) (MIT), [HaGeZi](https://github.com/hagezi/dns-blocklists) (GPL-3.0) y [EasyList](https://easylist.to) (GPL-3.0 / CC BY-SA 3.0). Vuelve a ejecutarlo de vez en cuando para actualizarlas.

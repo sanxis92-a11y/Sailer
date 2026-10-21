@@ -24,6 +24,11 @@ class Prefs private constructor(context: Context) {
         get() = prefs.getBoolean(KEY_DOH, true)
         set(value) = prefs.edit { putBoolean(KEY_DOH, value) }
 
+    /** Webs en las que el usuario ha desactivado el bloqueador. */
+    var adBlockAllowlist: Set<String>
+        get() = prefs.getStringSet(KEY_ALLOWLIST, emptySet())?.toSet() ?: emptySet()
+        set(value) = prefs.edit { putStringSet(KEY_ALLOWLIST, value) }
+
     var pinHash: String?
         get() = prefs.getString(KEY_PIN_HASH, null)
         set(value) = prefs.edit { putString(KEY_PIN_HASH, value) }
@@ -37,6 +42,7 @@ class Prefs private constructor(context: Context) {
         private const val KEY_LOCK = "lock"
         private const val KEY_BIOMETRIC = "biometric"
         private const val KEY_DOH = "doh"
+        private const val KEY_ALLOWLIST = "adblock_allowlist"
         private const val KEY_PIN_HASH = "pin_hash"
         private const val KEY_PIN_SALT = "pin_salt"
 

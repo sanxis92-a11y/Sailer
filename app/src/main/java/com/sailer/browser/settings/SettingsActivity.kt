@@ -11,10 +11,12 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.sailer.browser.BuildConfig
 import com.sailer.browser.R
 import com.sailer.browser.adblock.AdBlocker
+import com.sailer.browser.adblock.CosmeticFilter
 import com.sailer.browser.databinding.ActivitySettingsBinding
 import com.sailer.browser.lock.AppLock
 import com.sailer.browser.lock.LockActivity
 import com.sailer.browser.lock.SecureActivity
+import kotlin.concurrent.thread
 
 class SettingsActivity : SecureActivity() {
 
@@ -32,6 +34,7 @@ class SettingsActivity : SecureActivity() {
         binding.switchAdblock.setOnCheckedChangeListener { _, checked ->
             prefs.adBlockEnabled = checked
             AdBlocker.enabled = checked
+            thread { CosmeticFilter.rebuildScript() }
         }
 
         binding.switchDoh.isChecked = prefs.dohEnabled
