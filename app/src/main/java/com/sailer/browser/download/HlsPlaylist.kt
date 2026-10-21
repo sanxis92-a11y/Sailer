@@ -5,7 +5,13 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 /** Utilidades para leer listas HLS (.m3u8). */
 object HlsPlaylist {
 
-    data class Variant(val url: String, val bandwidth: Long, val width: Int, val height: Int)
+    data class Variant(
+        val url: String,
+        val bandwidth: Long,
+        val width: Int,
+        val height: Int,
+        val audioGroup: String?,
+    )
 
     private val attrRegex = Regex("""([A-Z0-9-]+)=("[^"]*"|[^,]*)""")
 
@@ -32,10 +38,32 @@ object HlsPlaylist {
                             bandwidth = a["BANDWIDTH"]?.toLongOrNull() ?: 0L,
                             width = resolution?.getOrNull(0)?.toIntOrNull() ?: 0,
                             height = resolution?.getOrNull(1)?.toIntOrNull() ?: 0,
+                            audioGroup = a["AUDIO"],
                         )
                     )
                 }
                 pending = null
+            }
+        }
+        return result
+    }
+
+    /**
+     * Pistas de audio separadas (#EXT-X-MEDIA TYPE=AUDIO): grupo -> dirección.
+     * Se prefiere la marcada por defecto.
+     */
+    fun audioRenditions(playlistUrl: String, text: String): Map<String, String> {
+        val result = LinkedHashMap<String, String>()
+        val defaults = HashSet<String>()
+        text.lineSequence().map { it.trim() }.filter { it.startsWith("#EXT-X-MEDIA:") }.forEach { line ->
+            val a = attrs(line)
+            val group = a["GROUP-ID"] ?: return@forEach
+            val uri = a["URI"] ?: return@forEach
+            if (a["TYPE"] != "AUDIO") return@forEach
+            val isDefault = a["DEFAULT"] == "YES"
+            if (group !in result || (isDefault && group !in defaults)) {
+                result[group] = resolve(playlistUrl, uri)
+                if (isDefault) defaults.add(group)
             }
         }
         return result

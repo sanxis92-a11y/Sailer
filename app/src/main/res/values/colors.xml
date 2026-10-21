@@ -6,4 +6,5 @@
     <color name="text">#FFE8EAED</color>
     <color name="text_dim">#FF9AA0A6</color>
     <color name="accent">#FF7C5CFF</color>
+    <color name="calculator_bg">#FF607D8B</color>
 </resources>

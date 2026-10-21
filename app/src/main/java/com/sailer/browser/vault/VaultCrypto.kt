@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -69,6 +70,33 @@ class VaultCrypto(context: Context) {
             input.close()
             throw e
         }
+    }
+
+    /** Abre un archivo cifrado para seguir escribiendo al final (lo crea si no existe). */
+    fun appendTo(file: File): OutputStream {
+        if (!file.exists() || file.length() < HEADER) {
+            file.delete()
+            return encrypt(FileOutputStream(file))
+        }
+        val iv = FileInputStream(file).use { readIv(it) }
+        val position = file.length() - HEADER
+        val cipher = ctr(Cipher.ENCRYPT_MODE, addToCounter(iv, position / 16))
+        val skip = (position % 16).toInt()
+        if (skip > 0) cipher.update(ByteArray(skip))
+        return CtrOutputStream(FileOutputStream(file, true), cipher)
+    }
+
+    /** Tamaño real (sin cifrar) del contenido de un archivo. */
+    fun plainLength(file: File): Long = if (file.exists()) maxOf(0L, file.length() - HEADER) else 0L
+
+    fun readIv(file: File): ByteArray = FileInputStream(file).use { readIv(it) }
+
+    /** Descifra (o cifra, es lo mismo en CTR) un bloque que empieza en [position] del contenido. */
+    fun xorAt(iv: ByteArray, position: Long, buffer: ByteArray, offset: Int, length: Int) {
+        val cipher = ctr(Cipher.DECRYPT_MODE, addToCounter(iv, position / 16))
+        val skip = (position % 16).toInt()
+        if (skip > 0) cipher.update(ByteArray(skip))
+        cipher.update(buffer, offset, length, buffer, offset)
     }
 
     fun encryptBytes(plain: ByteArray): ByteArray {

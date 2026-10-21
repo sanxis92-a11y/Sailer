@@ -3,6 +3,7 @@ package com.sailer.browser.media
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.sailer.browser.download.DashManifest
 import com.sailer.browser.download.Downloader
 import com.sailer.browser.download.HlsPlaylist
 import com.sailer.browser.download.HttpClients
@@ -29,6 +30,10 @@ data class MediaOption(
     val durationSec: Double,
     val host: String,
     val drm: Boolean,
+    /** Pista de audio separada (HLS) que hay que bajar y unir. */
+    val audioUrl: String? = null,
+    /** Calidad elegida dentro de un manifiesto DASH. */
+    val videoId: String? = null,
 ) {
     val isAudio get() = kind == MediaKind.AUDIO
 
@@ -74,7 +79,7 @@ class MediaInspector(private val context: Context) {
                 }
             }.awaitAll().flatten()
         }
-            .distinctBy { it.url }
+            .distinctBy { it.url + "#" + it.videoId }
             .sortedWith(
                 compareBy<MediaOption> { it.drm }
                     .thenBy { it.looksLikePreview }
@@ -109,6 +114,36 @@ class MediaInspector(private val context: Context) {
         pageDuration: Double,
     ): List<MediaOption> {
         val host = hostOf(item.url)
+        if (item.kind == MediaKind.DASH) {
+            val manifest = DashManifest.parse(item.url, fetchText(item.url, headers))
+            val duration = manifest.durationSec.takeIf { it > 0 } ?: pageDuration
+            val bestAudio = manifest.audios.firstOrNull()
+            val drm = manifest.hasDrm || manifest.isLive
+            if (manifest.videos.isEmpty() && bestAudio != null) {
+                return listOf(
+                    MediaOption(
+                        url = item.url, kind = MediaKind.DASH, quality = 0, format = bestAudio.extension.uppercase(),
+                        sizeBytes = if (duration > 0) (bestAudio.bandwidth * duration / 8).toLong() else -1,
+                        sizeIsEstimate = true, durationSec = duration, host = host, drm = drm,
+                    )
+                )
+            }
+            return manifest.videos.map { rep ->
+                val bandwidth = rep.bandwidth + (bestAudio?.bandwidth ?: 0)
+                MediaOption(
+                    url = item.url,
+                    kind = MediaKind.DASH,
+                    quality = shortSide(rep.width, rep.height),
+                    format = rep.extension.uppercase(),
+                    sizeBytes = if (duration > 0 && bandwidth > 0) (bandwidth * duration / 8).toLong() else -1,
+                    sizeIsEstimate = true,
+                    durationSec = duration,
+                    host = host,
+                    drm = drm,
+                    videoId = rep.id,
+                )
+            }
+        }
         if (item.kind == MediaKind.HLS) {
             val text = fetchText(item.url, headers)
             if (HlsPlaylist.isMaster(text)) {
@@ -118,6 +153,7 @@ class MediaInspector(private val context: Context) {
                 val bestText = runCatching { fetchText(best.url, headers) }.getOrNull()
                 val duration = bestText?.let { HlsPlaylist.durationSeconds(it) }?.takeIf { it > 0 } ?: pageDuration
                 val drm = HlsPlaylist.hasDrm(text) || (bestText != null && HlsPlaylist.hasDrm(bestText))
+                val audioTracks = HlsPlaylist.audioRenditions(item.url, text)
                 return variants.map { v ->
                     MediaOption(
                         url = v.url,
@@ -129,6 +165,7 @@ class MediaInspector(private val context: Context) {
                         durationSec = duration,
                         host = host,
                         drm = drm,
+                        audioUrl = v.audioGroup?.let { audioTracks[it] },
                     )
                 }
             }
@@ -174,7 +211,7 @@ class MediaInspector(private val context: Context) {
             url = item.url,
             kind = item.kind,
             quality = element?.let { shortSide(it.width, it.height) }?.takeIf { it > 0 } ?: qualityFromUrl(item.url),
-            format = if (item.kind == MediaKind.HLS) "Streaming" else formatName(MediaSniffer.extensionOf(item.url), null),
+            format = if (item.kind == MediaKind.HLS || item.kind == MediaKind.DASH) "Streaming" else formatName(MediaSniffer.extensionOf(item.url), null),
             sizeBytes = -1,
             sizeIsEstimate = false,
             durationSec = element?.duration ?: 0.0,

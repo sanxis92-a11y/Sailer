@@ -18,6 +18,9 @@ class LockActivity : SecureActivity() {
     private lateinit var binding: ActivityLockBinding
     private var failedAttempts = 0
 
+    /** Modo "comprobar PIN" (p. ej. para abrir los favoritos) sin tocar el bloqueo general. */
+    private val verifyOnly by lazy { intent.getBooleanExtra(EXTRA_VERIFY, false) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLockBinding.inflate(layoutInflater)
@@ -41,14 +44,14 @@ class LockActivity : SecureActivity() {
         // "Atrás" no se salta el bloqueo: manda la app a segundo plano.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                moveTaskToBack(true)
+                if (verifyOnly) finish() else moveTaskToBack(true)
             }
         })
     }
 
     override fun onResume() {
         super.onResume()
-        if (!AppLock.isLocked) finish()
+        if (!verifyOnly && !AppLock.isLocked) finish()
     }
 
     private fun tryPin() {
@@ -94,11 +97,13 @@ class LockActivity : SecureActivity() {
     }
 
     private fun unlock() {
-        AppLock.unlock()
+        if (verifyOnly) setResult(RESULT_OK) else AppLock.unlock()
         finish()
     }
 
     companion object {
+        const val EXTRA_VERIFY = "verify"
+
         fun isBiometricAvailable(context: android.content.Context): Boolean =
             BiometricManager.from(context)
                 .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS

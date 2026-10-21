@@ -40,6 +40,9 @@ class SettingsActivity : SecureActivity() {
         binding.switchDoh.isChecked = prefs.dohEnabled
         binding.switchDoh.setOnCheckedChangeListener { _, checked -> prefs.dohEnabled = checked }
 
+        binding.switchDisguise.isChecked = Disguise.isEnabled(this)
+        binding.switchDisguise.setOnCheckedChangeListener { _, checked -> Disguise.setEnabled(this, checked) }
+
         binding.switchLock.isChecked = AppLock.isConfigured(this)
         binding.switchLock.setOnCheckedChangeListener { _, checked ->
             if (checked) {

@@ -2,7 +2,7 @@
 
 Navegador Android personal, ligero y centrado en la privacidad, con descargador de vídeo, imágenes y audio.
 
-## Qué hace (versión 1.1)
+## Qué hace (versión 1.2)
 
 **Privacidad**
 - **Incógnito siempre**: al salir se borran cookies, caché, historial, formularios y almacenamiento de las webs. Si la app se cierra de golpe, se borra al volver a abrirla.
@@ -14,10 +14,14 @@ Navegador Android personal, ligero y centrado en la privacidad, con descargador 
 - Si una web no funciona bien, puedes desactivar el bloqueador solo en esa web desde el menú ⋮.
 - **Bloqueo con PIN o huella** al abrir la app y cada vez que vuelves a ella.
 - **DNS cifrado** (DNS over HTTPS) en las descargas, y guía para activar el DNS privado de Android para todo el móvil.
+- **Favoritos privados**, cifrados y protegidos con tu PIN.
+- **Disimulo opcional**: icono y nombre de «Calculadora» (Ajustes).
 - Sin ubicación, cámara ni micrófono para las webs, sin copias de seguridad en la nube y sin enviar datos a Google.
 
 **Descargas**
 - Botón de descarga (flecha ⬇️ arriba): muestra la portada de la página y cada vídeo/audio con su **calidad** (720p, 1080p…), **tamaño**, **duración** y formato, marcando el que probablemente es el vídeo principal y avisando de las vistas previas cortas. Los vídeos en streaming **HLS (.m3u8)** aparecen con cada calidad disponible.
+- Vídeos **DASH (.mpd)** sin DRM y vídeos con el **audio en una pista aparte**: se bajan las dos pistas y se unen en un solo archivo.
+- **Pausar y reanudar** descargas (desde la carpeta segura o la notificación). Si se corta internet, se reintentan solas y siguen donde iban.
 - Mantén pulsada una **imagen** o un **enlace** para descargarlo.
 - Los vídeos con **DRM** (Netflix, etc.) no se pueden descargar.
 - Todo se guarda en la **carpeta segura**: cifrada (AES-256) y oculta de la galería. Desde ahí puedes ver, renombrar, borrar o exportar.
@@ -34,8 +38,10 @@ Después, abre el `.apk` en el móvil. Android pedirá permiso para "instalar ap
 
 ## Limitaciones conocidas
 
-- Los vídeos DASH (`.mpd`) y los protegidos con DRM no se pueden descargar.
-- Si un vídeo HLS trae el audio en una pista separada, se descarga solo la pista de vídeo.
+- Los vídeos protegidos con DRM y las emisiones en directo no se pueden descargar.
+- Si el móvil no sabe unir un formato concreto de audio y vídeo, se guardan como dos archivos.
+- Al unir audio y vídeo, el resultado existe sin cifrar unos segundos dentro del almacenamiento privado de la app antes de cifrarse.
+- Una descarga en pausa se pierde si Android cierra la app por completo.
 - El DNS cifrado de la app solo afecta a las descargas: para las páginas, activa el DNS privado de Android (Ajustes de Sailer → "DNS cifrado para todo el móvil").
 - El APK se firma con una clave incluida en el repositorio (cómodo para uso personal, no apto para publicar en tiendas).
 

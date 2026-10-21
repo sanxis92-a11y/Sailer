@@ -81,6 +81,23 @@ class Vault private constructor(context: Context) {
         }
     }
 
+    /** Mete en la carpeta segura un archivo ya cifrado con [crypto] (lo mueve). */
+    fun adopt(file: File, name: String, kind: MediaKind, mime: String?): Entry {
+        val id = UUID.randomUUID().toString()
+        val target = File(dir, "$id.bin")
+        if (!file.renameTo(target)) {
+            file.copyTo(target, overwrite = true)
+            file.delete()
+        }
+        val entry = Entry(id, name, kind, mime, target.length() - VaultCrypto.HEADER, System.currentTimeMillis())
+        synchronized(this) {
+            entries.add(entry)
+            saveIndex()
+        }
+        notifyChanged()
+        return entry
+    }
+
     fun delete(entry: Entry) {
         synchronized(this) {
             entries.removeAll { it.id == entry.id }

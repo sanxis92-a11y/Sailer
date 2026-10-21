@@ -70,7 +70,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
         when (item) {
             is DownloadCenter.Task -> showTaskOptions(item)
             is Vault.Entry -> when (item.kind) {
-                MediaKind.VIDEO, MediaKind.AUDIO, MediaKind.IMAGE, MediaKind.HLS ->
+                MediaKind.VIDEO, MediaKind.AUDIO, MediaKind.IMAGE, MediaKind.HLS, MediaKind.DASH ->
                     startActivity(Intent(this, ViewerActivity::class.java).putExtra(ViewerActivity.EXTRA_ID, item.id))
                 MediaKind.FILE -> showEntryOptions(item)
             }
@@ -79,13 +79,19 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
 
     private fun showTaskOptions(task: DownloadCenter.Task) {
         val builder = MaterialAlertDialogBuilder(this).setTitle(task.request.title.ifBlank { task.request.url })
-        if (task.status == DownloadCenter.Status.FAILED) {
-            builder.setMessage(getString(R.string.vault_failed, task.error ?: ""))
-                .setPositiveButton(R.string.vault_retry) { _, _ -> DownloadCenter.retry(task) }
-                .setNegativeButton(R.string.vault_remove) { _, _ -> DownloadCenter.cancel(task) }
-        } else {
-            builder.setPositiveButton(R.string.vault_cancel_download) { _, _ -> DownloadCenter.cancel(task) }
-                .setNegativeButton(R.string.close, null)
+        when (task.status) {
+            DownloadCenter.Status.FAILED ->
+                builder.setMessage(getString(R.string.vault_failed, task.error ?: ""))
+                    .setPositiveButton(R.string.vault_retry) { _, _ -> DownloadCenter.resume(task) }
+                    .setNegativeButton(R.string.vault_remove) { _, _ -> DownloadCenter.cancel(task) }
+            DownloadCenter.Status.PAUSED ->
+                builder.setPositiveButton(R.string.vault_resume) { _, _ -> DownloadCenter.resume(task) }
+                    .setNegativeButton(R.string.vault_cancel_download) { _, _ -> DownloadCenter.cancel(task) }
+                    .setNeutralButton(R.string.close, null)
+            else ->
+                builder.setPositiveButton(R.string.vault_pause) { _, _ -> DownloadCenter.pause(task) }
+                    .setNegativeButton(R.string.vault_cancel_download) { _, _ -> DownloadCenter.cancel(task) }
+                    .setNeutralButton(R.string.close, null)
         }
         builder.show()
     }
@@ -173,19 +179,26 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 ?: ItemVaultBinding.inflate(layoutInflater, parent, false)
             when (val item = items[position]) {
                 is DownloadCenter.Task -> {
-                    row.icon.text = if (item.status == DownloadCenter.Status.FAILED) "⚠️" else "⬇️"
+                    row.icon.text = when (item.status) {
+                        DownloadCenter.Status.FAILED -> "⚠️"
+                        DownloadCenter.Status.PAUSED -> "⏸️"
+                        else -> "⬇️"
+                    }
                     row.title.text = item.request.title.ifBlank { item.request.url }
                     row.subtitle.text = when (item.status) {
                         DownloadCenter.Status.QUEUED -> getString(R.string.vault_queued)
-                        DownloadCenter.Status.RUNNING ->
-                            if (item.progress >= 0) getString(R.string.vault_progress, item.progress)
-                            else getString(R.string.vault_downloading)
+                        DownloadCenter.Status.RUNNING -> when {
+                            item.retrying -> getString(R.string.vault_retrying)
+                            item.progress >= 0 -> getString(R.string.vault_progress, item.progress)
+                            else -> getString(R.string.vault_downloading)
+                        }
+                        DownloadCenter.Status.PAUSED -> getString(R.string.vault_paused, maxOf(item.progress, 0))
                         DownloadCenter.Status.FAILED -> getString(R.string.vault_failed, item.error ?: "")
                     }
                 }
                 is Vault.Entry -> {
                     row.icon.text = when (item.kind) {
-                        MediaKind.VIDEO, MediaKind.HLS -> "🎬"
+                        MediaKind.VIDEO, MediaKind.HLS, MediaKind.DASH -> "🎬"
                         MediaKind.AUDIO -> "🎵"
                         MediaKind.IMAGE -> "🖼️"
                         MediaKind.FILE -> "📄"

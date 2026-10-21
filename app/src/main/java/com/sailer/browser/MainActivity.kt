@@ -54,6 +54,8 @@ import com.sailer.browser.web.DownloadHandler
 import com.sailer.browser.web.SailerChromeClient
 import com.sailer.browser.web.SailerWebViewClient
 import com.sailer.browser.web.UrlUtils
+import com.sailer.browser.vault.Bookmarks
+import com.sailer.browser.vault.BookmarksActivity
 import com.sailer.browser.vault.VaultActivity
 import org.json.JSONArray
 import org.json.JSONObject
@@ -74,6 +76,13 @@ class MainActivity : SecureActivity(),
 
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+
+    private val bookmarksLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            result.data?.getStringExtra(BookmarksActivity.EXTRA_URL)?.let { url ->
+                (tabManager.current ?: tabManager.newTab()).webView.loadUrl(url)
+            }
+        }
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -198,6 +207,9 @@ class MainActivity : SecureActivity(),
                     R.id.action_tabs -> showTabs()
                     R.id.action_adblock_site -> toggleAdBlockForSite()
                     R.id.action_media -> showMedia()
+                    R.id.action_add_bookmark -> addBookmark()
+                    R.id.action_bookmarks ->
+                        bookmarksLauncher.launch(Intent(this@MainActivity, BookmarksActivity::class.java))
                     R.id.action_vault -> startActivity(Intent(this@MainActivity, VaultActivity::class.java))
                     R.id.action_settings -> startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
                     R.id.action_wipe_exit -> wipeAndExit()
@@ -220,6 +232,15 @@ class MainActivity : SecureActivity(),
             .setPositiveButton(R.string.menu_new_tab) { _, _ -> tabManager.newTab(); focusAddressBar() }
             .setNegativeButton(R.string.close, null)
             .show()
+    }
+
+    private fun addBookmark() {
+        val tab = tabManager.current ?: return
+        val url = UrlUtils.forDisplay(tab.url).ifEmpty { return }
+        thread {
+            Bookmarks.get(this).add(tab.title, url)
+            runOnUiThread { Toast.makeText(this, R.string.bookmark_added, Toast.LENGTH_SHORT).show() }
+        }
     }
 
     private fun toggleAdBlockForSite() {
@@ -491,7 +512,12 @@ class MainActivity : SecureActivity(),
         }
         row.download.isEnabled = !option.drm
         row.download.setOnClickListener {
-            startDownload(option.url, option.kind, titleSuffix = option.qualityLabel)
+            startDownload(
+                option.url, option.kind,
+                titleSuffix = option.qualityLabel,
+                audioUrl = option.audioUrl,
+                videoId = option.videoId,
+            )
             onChosen()
         }
         return row.root
@@ -541,6 +567,8 @@ class MainActivity : SecureActivity(),
         mimeType: String? = null,
         fileName: String? = null,
         titleSuffix: String? = null,
+        audioUrl: String? = null,
+        videoId: String? = null,
     ) {
         val tab = tabManager.current
         val baseTitle = tab?.title?.ifBlank { null } ?: getString(R.string.app_name)
@@ -554,6 +582,8 @@ class MainActivity : SecureActivity(),
                 userAgent = tab?.webView?.settings?.userAgentString ?: "",
                 mimeType = mimeType,
                 fileName = fileName,
+                audioUrl = audioUrl,
+                videoId = videoId,
             )
         )
         // Para que la descarga siga con la app cerrada, Android 13+ pide permiso de notificaciones.

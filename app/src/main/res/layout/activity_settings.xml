@@ -52,6 +52,13 @@
             <TextView style="@style/SailerSectionTitle" android:text="@string/settings_section_lock" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchDisguise"
+                style="@style/SailerSwitch"
+                android:text="@string/settings_disguise" />
+
+            <TextView style="@style/SailerHint" android:text="@string/settings_disguise_help" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switchLock"
                 style="@style/SailerSwitch"
                 android:text="@string/settings_lock" />

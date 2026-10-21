@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.sailer.browser.R
+import com.sailer.browser.settings.Disguise
 import com.sailer.browser.vault.VaultActivity
 
 /**
@@ -33,6 +34,7 @@ class DownloadService : Service(), DownloadCenter.Listener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         goForeground()
+        if (intent?.action == ACTION_PAUSE_ALL) DownloadCenter.pauseAll()
         if (DownloadCenter.activeCount == 0) stop()
         return START_NOT_STICKY
     }
@@ -64,8 +66,20 @@ class DownloadService : Service(), DownloadCenter.Listener {
 
     private fun buildNotification() = NotificationCompat.Builder(this, CHANNEL)
         .setSmallIcon(R.drawable.ic_download)
-        .setContentTitle(getString(R.string.app_name))
+        .setContentTitle(Disguise.label(this))
         .setContentText(getString(R.string.downloads_running, DownloadCenter.activeCount))
+        .apply {
+            val running = DownloadCenter.tasks.filter { it.status == DownloadCenter.Status.RUNNING }
+            val progress = running.map { it.progress }.filter { it >= 0 }
+            if (progress.isEmpty()) setProgress(0, 0, true) else setProgress(100, progress.average().toInt(), false)
+        }
+        .addAction(
+            0, getString(R.string.downloads_pause_all),
+            PendingIntent.getService(
+                this, 1, Intent(this, DownloadService::class.java).setAction(ACTION_PAUSE_ALL),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            ),
+        )
         .setOngoing(true)
         .setSilent(true)
         .setVisibility(NotificationCompat.VISIBILITY_SECRET)
@@ -80,6 +94,7 @@ class DownloadService : Service(), DownloadCenter.Listener {
     companion object {
         private const val CHANNEL = "downloads"
         private const val NOTIFICATION_ID = 1
+        private const val ACTION_PAUSE_ALL = "com.sailer.browser.PAUSE_ALL"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, DownloadService::class.java))

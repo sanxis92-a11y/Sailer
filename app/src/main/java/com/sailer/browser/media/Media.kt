@@ -2,7 +2,7 @@ package com.sailer.browser.media
 
 import android.net.Uri
 
-enum class MediaKind { VIDEO, AUDIO, IMAGE, HLS, FILE }
+enum class MediaKind { VIDEO, AUDIO, IMAGE, HLS, DASH, FILE }
 
 data class DetectedMedia(val url: String, val kind: MediaKind)
 
@@ -25,6 +25,7 @@ object MediaSniffer {
         if (!url.startsWith("https://", ignoreCase = true)) return null
         return when (extensionOf(url)) {
             "m3u8" -> MediaKind.HLS
+            "mpd" -> MediaKind.DASH
             in VIDEO_EXT -> MediaKind.VIDEO
             in AUDIO_EXT -> MediaKind.AUDIO
             else -> null
@@ -33,6 +34,7 @@ object MediaSniffer {
 
     fun kindForExtension(ext: String?): MediaKind? = when (ext?.lowercase()) {
         "m3u8" -> MediaKind.HLS
+        "mpd" -> MediaKind.DASH
         "ts" -> MediaKind.VIDEO
         in VIDEO_EXT -> MediaKind.VIDEO
         in AUDIO_EXT -> MediaKind.AUDIO
@@ -43,6 +45,7 @@ object MediaSniffer {
     fun kindForMime(mime: String?): MediaKind? = when {
         mime == null -> null
         mime.contains("mpegurl", ignoreCase = true) -> MediaKind.HLS
+        mime.contains("dash+xml", ignoreCase = true) -> MediaKind.DASH
         mime.startsWith("video/") -> MediaKind.VIDEO
         mime.startsWith("audio/") -> MediaKind.AUDIO
         mime.startsWith("image/") -> MediaKind.IMAGE
