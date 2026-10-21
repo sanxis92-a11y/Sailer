@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sailer</string>
+    <string name="address_hint">Buscar o escribir dirección</string>
+    <string name="menu_more">Más opciones</string>
+    <string name="tabs_button">Pestañas abiertas</string>
+    <string name="menu_new_tab">Nueva pestaña</string>
+    <string name="menu_close_tab">Cerrar pestaña</string>
+    <string name="menu_reload">Recargar</string>
+    <string name="menu_forward">Adelante</string>
+    <string name="menu_tabs">Ver pestañas</string>
+    <string name="menu_wipe_exit">Borrar todo y salir</string>
+    <string name="tabs_title">Pestañas</string>
+    <string name="new_tab_title">Nueva pestaña</string>
+    <string name="close">Cerrar</string>
+    <string name="http_blocked">Bloqueado: esta web no usa conexión segura (HTTPS).</string>
+    <string name="ssl_error">Bloqueado: el certificado de seguridad de esta web no es válido.</string>
+    <string name="downloads_soon">Las descargas llegarán en una próxima versión.</string>
+    <string name="wiped">Todo borrado</string>
+</resources>
