@@ -8,7 +8,7 @@ Navegador Android personal, ligero y centrado en la privacidad, con descargador 
 - **Incógnito siempre**: al salir se borran cookies, caché, historial, formularios y almacenamiento de las webs. Si la app se cierra de golpe, se borra al volver a abrirla.
 - **Solo HTTPS**: las direcciones `http://` pasan a `https://`; las conexiones sin cifrar o con certificados falsos se bloquean.
 - **Sin capturas**: no se pueden hacer capturas ni grabaciones, y en "apps recientes" la vista previa sale en negro.
-- **Bloqueador** de anuncios, rastreadores y redirecciones de publicidad: ~250.000 dominios (StevenBlack, HaGeZi PRO++, EasyList, EasyList Adult, EasyPrivacy).
+- **Bloqueador** de anuncios, rastreadores y redirecciones de publicidad: ~227.000 dominios (HaGeZi PRO++, EasyList, EasyList Adult, EasyPrivacy).
 - **Bloqueo cosmético**: oculta los huecos y banners de anuncios dentro de las páginas (reglas de EasyList y EasyList Adult).
 - **Pop-ups**: solo se abre una pestaña nueva si tocas un enlace que lleva justo ahí; la publicidad que se abre al tocar en cualquier sitio se descarta.
 - Si una web no funciona bien, puedes desactivar el bloqueador solo en esa web desde el menú ⋮.
@@ -63,4 +63,4 @@ app/src/main/java/com/sailer/browser/
 └── web/                   Configuración privada de WebView
 ```
 
-Las listas de bloqueo se generan con `python3 tools/build_blocklists.py` a partir de [StevenBlack/hosts](https://github.com/StevenBlack/hosts) (MIT), [HaGeZi](https://github.com/hagezi/dns-blocklists) (GPL-3.0) y [EasyList](https://easylist.to) (GPL-3.0 / CC BY-SA 3.0). Vuelve a ejecutarlo de vez en cuando para actualizarlas.
+Las listas de bloqueo se generan con `python3 tools/build_blocklists.py` a partir de [HaGeZi](https://github.com/hagezi/dns-blocklists) (GPL-3.0) y [EasyList](https://easylist.to) (GPL-3.0 / CC BY-SA 3.0). Vuelve a ejecutarlo de vez en cuando para actualizarlas.

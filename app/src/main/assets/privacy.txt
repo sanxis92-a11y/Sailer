@@ -1,0 +1,24 @@
+Sailer no recoge, guarda ni envía ningún dato personal a sus creadores. No hay cuentas, ni publicidad, ni estadísticas de uso, ni seguimiento.
+
+Lo que se queda en tu móvil
+• Historial, pestañas, cookies y caché se borran al cerrar la app o al pulsar «Borrar todo y salir».
+• Las descargas y los favoritos se guardan cifrados dentro de la app. Solo salen de ella si tú los exportas.
+• El PIN se guarda de forma protegida (nunca en texto legible) y la huella la gestiona Android: Sailer no la ve.
+• La copia de seguridad solo se crea si tú la pides, en el sitio que tú elijas y cifrada con tu contraseña.
+
+Lo que sale a internet
+• Las webs que visitas reciben tu petición, como con cualquier navegador.
+• Las búsquedas que escribes en la barra se envían a DuckDuckGo.
+• Si el «DNS cifrado» está activado, los nombres de las webs que visitas se consultan de forma cifrada a Cloudflare (1.1.1.1) en lugar de a tu operadora. Puedes desactivarlo en Ajustes.
+• Sailer desactiva Google Safe Browsing y las estadísticas de WebView para no enviar las direcciones que visitas a Google.
+
+Permisos
+• Internet: para cargar las webs.
+• Notificaciones: para mostrar el progreso de las descargas.
+• Huella o cara: solo si activas el desbloqueo biométrico.
+
+Menores
+Sailer no está dirigida a menores de 18 años.
+
+Cambios y contacto
+Si esta política cambia, se actualizará en la app y en la ficha de Google Play. Para cualquier duda, escribe al correo de contacto que aparece en la ficha de la app.

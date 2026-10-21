@@ -8,7 +8,7 @@ Crea en app/src/main/assets/:
   - cosmetic_generic.txt     selectores CSS que se ocultan en todas las webs
   - cosmetic_specific.txt    reglas por web ("dominios##selector" y excepciones "dominio#@#selector")
 
-Fuentes: StevenBlack hosts (MIT), HaGeZi Multi PRO++ (GPL-3.0),
+Fuentes: HaGeZi Multi PRO++ (GPL-3.0),
 EasyList / EasyList Adult / EasyPrivacy (GPL-3.0 / CC BY-SA 3.0).
 """
 import re
@@ -20,7 +20,8 @@ ASSETS = Path(__file__).resolve().parent.parent / "app/src/main/assets"
 EL = "https://raw.githubusercontent.com/easylist/easylist/master/"
 
 DOMAIN_SOURCES = {
-    "hosts": ["https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"],
+    # StevenBlack hosts se quitó: mezcla listas con licencia no comercial (CC BY-NC-SA).
+    "hosts": [],
     "plain": ["https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro.plus-onlydomains.txt"],
     "abp": [
         EL + "easylist/easylist_adservers.txt",

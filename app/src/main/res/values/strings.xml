@@ -41,6 +41,10 @@
     <string name="download_image">Descargar imagen</string>
     <string name="download_link">Descargar enlace</string>
     <string name="open_new_tab">Abrir en pestaña nueva</string>
+    <string name="media_not_allowed">Esta web no permite descargar sus vídeos desde Sailer.</string>
+    <string name="download_notice_title">Antes de descargar</string>
+    <string name="download_notice">Descarga solo contenido propio, libre o que tengas permiso para guardar. Respeta los derechos de autor y las condiciones de cada web.\n\nLos vídeos protegidos (DRM) y los de algunas plataformas no se pueden descargar.</string>
+    <string name="download_notice_ok">Entendido</string>
     <string name="download_started">Descargando en la carpeta segura…</string>
     <string name="downloads_channel">Descargas</string>
     <string name="downloads_running">Descargando %d archivo(s)</string>
@@ -86,7 +90,7 @@
     <!-- Ajustes -->
     <string name="settings_section_privacy">Privacidad</string>
     <string name="settings_adblock">Bloquear anuncios, rastreadores y pop-ups</string>
-    <string name="settings_adblock_help">Usa una lista de más de 70.000 dominios de publicidad y rastreo.</string>
+    <string name="settings_adblock_help">Usa una lista de más de 220.000 dominios de publicidad y rastreo.</string>
     <string name="settings_doh">DNS cifrado (páginas y descargas)</string>
     <string name="settings_doh_help">Las páginas y las descargas consultan las direcciones de forma cifrada (Cloudflare 1.1.1.1), así tu operadora no ve qué webs visitas.</string>
     <string name="settings_private_dns">DNS cifrado para todo el móvil</string>
@@ -104,6 +108,9 @@
     <string name="settings_pin_short">El PIN debe tener al menos 4 números</string>
     <string name="settings_pin_mismatch">Los PIN no coinciden</string>
     <string name="settings_pin_saved">PIN guardado</string>
+    <string name="settings_section_about">Información</string>
+    <string name="settings_privacy_policy">Política de privacidad</string>
+    <string name="settings_licenses">Licencias de código abierto</string>
     <string name="settings_version">Sailer %s</string>
 
     <!-- Copia de seguridad -->

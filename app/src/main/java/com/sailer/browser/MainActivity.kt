@@ -35,6 +35,7 @@ import com.sailer.browser.databinding.ItemMediaBinding
 import com.sailer.browser.databinding.SheetMediaBinding
 import com.sailer.browser.media.MediaElementInfo
 import com.sailer.browser.media.MediaInspector
+import com.sailer.browser.media.StorePolicy
 import com.sailer.browser.media.MediaOption
 import com.sailer.browser.media.PageMediaInfo
 import com.sailer.browser.adblock.AdBlocker
@@ -395,6 +396,7 @@ class MainActivity : SecureActivity(),
 
     private fun addMedia(view: WebView, media: DetectedMedia) {
         val tab = tabManager.findByWebView(view) ?: return
+        if (!StorePolicy.allowsKind(media.kind)) return
         // Si ya hay una lista HLS, no hace falta listar también sus trozos.
         if (tab.media.containsKey(media.url)) return
         tab.media[media.url] = media
@@ -449,7 +451,13 @@ class MainActivity : SecureActivity(),
         view.pageTitle.text = pageTitle
         sheet.show()
 
-        val detected = tab.media.values.toList()
+        if (!StorePolicy.allowsDownload(tab.url, tab.url)) {
+            view.loading.visibility = View.GONE
+            view.empty.visibility = View.VISIBLE
+            view.empty.setText(R.string.media_not_allowed)
+            return
+        }
+        val detected = tab.media.values.filter { StorePolicy.allowsDownload(it.url, tab.url) }
         if (detected.isEmpty()) {
             view.loading.visibility = View.GONE
             view.empty.visibility = View.VISIBLE
@@ -572,6 +580,23 @@ class MainActivity : SecureActivity(),
         videoId: String? = null,
     ) {
         val tab = tabManager.current
+        if (!StorePolicy.allowsDownload(url, tab?.url) || !StorePolicy.allowsKind(kind)) {
+            Toast.makeText(this, R.string.media_not_allowed, Toast.LENGTH_LONG).show()
+            return
+        }
+        val prefs = Prefs.get(this)
+        if (!prefs.downloadNoticeAccepted) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.download_notice_title)
+                .setMessage(R.string.download_notice)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.download_notice_ok) { _, _ ->
+                    prefs.downloadNoticeAccepted = true
+                    startDownload(url, kind, mimeType, fileName, titleSuffix, audioUrl, videoId)
+                }
+                .showSecure()
+            return
+        }
         val baseTitle = tab?.title?.ifBlank { null } ?: getString(R.string.app_name)
         val secureUrl = if (url.startsWith("data:")) url else UrlUtils.upgradeToHttps(url)
         DownloadCenter.enqueue(

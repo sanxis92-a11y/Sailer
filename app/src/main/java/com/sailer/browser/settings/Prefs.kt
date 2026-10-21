@@ -27,6 +27,11 @@ class Prefs private constructor(context: Context) {
         get() = prefs.getBoolean(KEY_DOH, true)
         set(value) = prefs.edit { putBoolean(KEY_DOH, value) }
 
+    /** El usuario ya ha leído el aviso de derechos de autor antes de su primera descarga. */
+    var downloadNoticeAccepted: Boolean
+        get() = prefs.getBoolean(KEY_DOWNLOAD_NOTICE, false)
+        set(value) = prefs.edit { putBoolean(KEY_DOWNLOAD_NOTICE, value) }
+
     /**
      * Webs en las que el usuario ha desactivado el bloqueador. Se guardan
      * cifradas, porque revelan qué webs visitas.
@@ -75,6 +80,7 @@ class Prefs private constructor(context: Context) {
         private const val KEY_LOCK = "lock"
         private const val KEY_BIOMETRIC = "biometric"
         private const val KEY_DOH = "doh"
+        private const val KEY_DOWNLOAD_NOTICE = "download_notice"
         private const val KEY_ALLOWLIST = "adblock_allowlist"
         private const val KEY_ALLOWLIST_ENC = "adblock_allowlist_enc"
         private const val KEY_PIN_VERSION = "pin_version"

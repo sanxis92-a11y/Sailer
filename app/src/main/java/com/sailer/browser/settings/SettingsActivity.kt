@@ -60,6 +60,10 @@ class SettingsActivity : SecureActivity() {
             WebDns.apply(this)
         }
 
+        if (!Disguise.isAvailable) {
+            binding.switchDisguise.visibility = View.GONE
+            binding.disguiseHelp.visibility = View.GONE
+        }
         binding.switchDisguise.isChecked = Disguise.isEnabled(this)
         binding.switchDisguise.setOnCheckedChangeListener { _, checked -> Disguise.setEnabled(this, checked) }
 
@@ -91,8 +95,20 @@ class SettingsActivity : SecureActivity() {
             AppLock.skipLockBriefly()
             importLauncher.launch(arrayOf("*/*"))
         }
+        binding.privacyPolicy.setOnClickListener { showTextAsset(R.string.settings_privacy_policy, "privacy.txt") }
+        binding.licenses.setOnClickListener { showTextAsset(R.string.settings_licenses, "licenses.txt") }
         binding.version.text = getString(R.string.settings_version, BuildConfig.VERSION_NAME)
         updateLockViews()
+    }
+
+    /** Muestra un texto largo guardado en assets (política de privacidad, licencias). */
+    private fun showTextAsset(title: Int, asset: String) {
+        val text = assets.open(asset).bufferedReader().use { it.readText() }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(text)
+            .setPositiveButton(R.string.close, null)
+            .showSecure()
     }
 
     private fun updateLockViews() {

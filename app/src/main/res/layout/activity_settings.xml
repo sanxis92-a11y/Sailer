@@ -56,7 +56,10 @@
                 style="@style/SailerSwitch"
                 android:text="@string/settings_disguise" />
 
-            <TextView style="@style/SailerHint" android:text="@string/settings_disguise_help" />
+            <TextView
+                android:id="@+id/disguiseHelp"
+                style="@style/SailerHint"
+                android:text="@string/settings_disguise_help" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switchLock"
@@ -94,6 +97,23 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/backup_import" />
+
+            <TextView style="@style/SailerSectionTitle" android:text="@string/settings_section_about" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/privacyPolicy"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_privacy_policy" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/licenses"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_licenses" />
 
             <TextView
                 android:id="@+id/version"

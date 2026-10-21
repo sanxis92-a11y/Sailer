@@ -5,14 +5,34 @@ plugins {
 
 android {
     namespace = "com.sailer.browser"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sailer.browser"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 5
-        versionName = "1.3.0"
+        targetSdk = 36
+        versionCode = 6
+        versionName = "1.4.0"
+    }
+
+    // Dos versiones de la app:
+    //  - full: la completa, para instalar desde GitHub (APK).
+    //  - play: la de Google Play. Sin disimulo de icono, sin descargas de
+    //    YouTube ni plataformas de pago y con aviso de derechos de autor.
+    flavorDimensions += "store"
+    productFlavors {
+        create("full") {
+            dimension = "store"
+            buildConfigField("boolean", "STREAM_DOWNLOADS", "true")
+            buildConfigField("boolean", "DISGUISE", "true")
+        }
+        create("play") {
+            dimension = "store"
+            applicationIdSuffix = ".play"
+            // Descargador incluido, pero con webs bloqueadas (ver media/StorePolicy).
+            buildConfigField("boolean", "STREAM_DOWNLOADS", "true")
+            buildConfigField("boolean", "DISGUISE", "false")
+        }
     }
 
     signingConfigs {

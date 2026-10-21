@@ -34,23 +34,33 @@ jobs:
             echo "Sin clave privada: se firma con la clave de depuración"
           fi
 
-      - name: Compilar APK
+      # APK completo (para instalar a mano) y paquete AAB para subir a Google Play.
+      - name: Compilar APK y AAB
         env:
           SAILER_KEYSTORE_PASSWORD: ${{ secrets.SAILER_KEYSTORE_PASSWORD }}
           SAILER_KEY_ALIAS: ${{ secrets.SAILER_KEY_ALIAS }}
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleFullRelease bundlePlayRelease --no-daemon
 
-      - name: Poner nombre al APK
+      - name: Poner nombre a los archivos
         run: |
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          cp app/build/outputs/apk/release/app-release.apk "Sailer-$VERSION.apk"
+          cp app/build/outputs/apk/full/release/app-full-release.apk "Sailer-$VERSION.apk"
+          cp app/build/outputs/bundle/playRelease/app-play-release.aab "Sailer-Play-$VERSION.aab"
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
           name: Sailer-apk
           path: Sailer-*.apk
+          retention-days: 30
+
+      # Este es el archivo que se sube a Google Play Console.
+      - name: Subir AAB de Google Play
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sailer-play-aab
+          path: Sailer-Play-*.aab
           retention-days: 30
 
       # En la rama principal, publicar también una "Release" para descargarla fácil.
