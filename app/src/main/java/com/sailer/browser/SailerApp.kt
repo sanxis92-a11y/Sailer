@@ -6,6 +6,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.adblock.CosmeticFilter
+import com.sailer.browser.dns.WebDns
 import com.sailer.browser.download.DownloadCenter
 import com.sailer.browser.lock.AppLock
 import com.sailer.browser.privacy.PrivacyManager
@@ -23,6 +24,8 @@ class SailerApp : Application() {
         AdBlocker.load(this)
         CosmeticFilter.load(this)
         DownloadCenter.init(this)
+        // DNS cifrado también para las páginas (si está activado).
+        WebDns.apply(this)
 
         // Bloquear al abrir y cada vez que la app pasa a segundo plano.
         AppLock.lockIfEnabled(this)

@@ -10,6 +10,7 @@ import android.widget.BaseAdapter
 import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.sailer.browser.lock.showSecure
 import com.sailer.browser.R
 import com.sailer.browser.databinding.ActivityBookmarksBinding
 import com.sailer.browser.databinding.ItemVaultBinding
@@ -73,7 +74,10 @@ class BookmarksActivity : SecureActivity() {
             .setTitle(bookmark.title)
             .setItems(arrayOf(getString(R.string.vault_rename), getString(R.string.vault_delete))) { _, which ->
                 if (which == 0) {
-                    val field = EditText(this).apply { setText(bookmark.title) }
+                    val field = EditText(this).apply {
+            setText(bookmark.title)
+            imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+        }
                     MaterialAlertDialogBuilder(this)
                         .setTitle(R.string.vault_rename)
                         .setView(field)
@@ -82,13 +86,13 @@ class BookmarksActivity : SecureActivity() {
                             showList()
                         }
                         .setNegativeButton(android.R.string.cancel, null)
-                        .show()
+                        .showSecure()
                 } else {
                     bookmarks.remove(bookmark)
                     showList()
                 }
             }
-            .show()
+            .showSecure()
     }
 
     private val adapter = object : BaseAdapter() {

@@ -81,14 +81,14 @@
     <string name="lock_use_pin">Usar PIN</string>
     <string name="lock_biometric_title">Desbloquear Sailer</string>
     <string name="lock_wrong_pin">PIN incorrecto</string>
-    <string name="lock_wait">Demasiados intentos. Espera 30 segundos.</string>
+    <string name="lock_wait_seconds">Demasiados intentos. Espera %d segundos.</string>
 
     <!-- Ajustes -->
     <string name="settings_section_privacy">Privacidad</string>
     <string name="settings_adblock">Bloquear anuncios, rastreadores y pop-ups</string>
     <string name="settings_adblock_help">Usa una lista de más de 70.000 dominios de publicidad y rastreo.</string>
-    <string name="settings_doh">DNS cifrado en las descargas</string>
-    <string name="settings_doh_help">Las descargas consultan las direcciones de forma cifrada (Cloudflare 1.1.1.1), así tu operadora no ve qué webs visitas.</string>
+    <string name="settings_doh">DNS cifrado (páginas y descargas)</string>
+    <string name="settings_doh_help">Las páginas y las descargas consultan las direcciones de forma cifrada (Cloudflare 1.1.1.1), así tu operadora no ve qué webs visitas.</string>
     <string name="settings_private_dns">DNS cifrado para todo el móvil</string>
     <string name="settings_private_dns_help">Las páginas web usan las DNS del sistema. Para cifrarlas en todo el móvil:\n\n1. Abre Ajustes → Redes e Internet (o Conexiones) → DNS privado.\n2. Elige «Nombre del proveedor de DNS privado».\n3. Escribe: dns.adguard-dns.com (cifra y además bloquea anuncios) o one.one.one.one\n4. Guarda.</string>
     <string name="settings_open_settings">Abrir ajustes</string>
@@ -105,4 +105,22 @@
     <string name="settings_pin_mismatch">Los PIN no coinciden</string>
     <string name="settings_pin_saved">PIN guardado</string>
     <string name="settings_version">Sailer %s</string>
+
+    <!-- Copia de seguridad -->
+    <string name="backup_section">Copia de seguridad</string>
+    <string name="backup_help">Guarda la carpeta segura y los favoritos en un único archivo protegido con una contraseña. Úsalo antes de reinstalar Sailer o para pasarlo a otro móvil.</string>
+    <string name="backup_export">Exportar copia cifrada</string>
+    <string name="backup_import">Importar copia</string>
+    <string name="backup_password_title">Contraseña de la copia</string>
+    <string name="backup_password_help">Necesitarás esta contraseña para recuperar la copia. Si la olvidas, nadie podrá abrirla.</string>
+    <string name="backup_password">Contraseña</string>
+    <string name="backup_password_repeat">Repite la contraseña</string>
+    <string name="backup_password_short">La contraseña debe tener al menos 8 caracteres</string>
+    <string name="backup_password_mismatch">Las contraseñas no coinciden</string>
+    <string name="backup_working">Preparando la copia… %1$d de %2$d archivos</string>
+    <string name="backup_importing">Recuperando… %1$d de %2$d archivos</string>
+    <string name="backup_done">Copia guardada: %1$d archivos y %2$d favoritos.</string>
+    <string name="backup_imported">Recuperados %1$d archivos y %2$d favoritos.</string>
+    <string name="backup_wrong_password">Contraseña incorrecta o archivo dañado.</string>
+    <string name="backup_failed">No se pudo completar: %1$s</string>
 </resources>

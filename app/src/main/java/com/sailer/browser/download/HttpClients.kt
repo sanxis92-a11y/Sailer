@@ -5,6 +5,7 @@ import android.webkit.CookieManager
 import com.sailer.browser.settings.Prefs
 import okhttp3.Cookie
 import okhttp3.CookieJar
+import okhttp3.Dns
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -15,31 +16,26 @@ import java.util.concurrent.TimeUnit
 /** Cliente de red de las descargas, con DNS cifrado (DNS over HTTPS) opcional. */
 object HttpClients {
 
-    @Volatile
-    private var cached: Pair<Boolean, OkHttpClient>? = null
-
-    fun get(context: Context): OkHttpClient {
-        val doh = Prefs.get(context).dohEnabled
-        cached?.let { (cachedDoh, client) -> if (cachedDoh == doh) return client }
-        val base = OkHttpClient.Builder()
+    private val base: OkHttpClient by lazy {
+        OkHttpClient.Builder()
             .cookieJar(WebViewCookieJar)
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
-        val client = if (doh) {
-            // Cloudflare (1.1.1.1): las consultas DNS viajan cifradas por HTTPS.
-            val dns = DnsOverHttps.Builder()
-                .client(base)
-                .url("https://cloudflare-dns.com/dns-query".toHttpUrl())
-                .bootstrapDnsHosts(InetAddress.getByName("1.1.1.1"), InetAddress.getByName("1.0.0.1"))
-                .build()
-            base.newBuilder().dns(dns).build()
-        } else {
-            base
-        }
-        cached = doh to client
-        return client
     }
+
+    /** Cloudflare (1.1.1.1): las consultas DNS viajan cifradas por HTTPS. */
+    val dohDns: Dns by lazy {
+        DnsOverHttps.Builder()
+            .client(base.newBuilder().cookieJar(CookieJar.NO_COOKIES).build())
+            .url("https://cloudflare-dns.com/dns-query".toHttpUrl())
+            .bootstrapDnsHosts(InetAddress.getByName("1.1.1.1"), InetAddress.getByName("1.0.0.1"))
+            .build()
+    }
+
+    private val dohClient: OkHttpClient by lazy { base.newBuilder().dns(dohDns).build() }
+
+    fun get(context: Context): OkHttpClient = if (Prefs.get(context).dohEnabled) dohClient else base
 
     /** Usa las cookies de la sesión actual del navegador (nunca guarda nuevas). */
     private object WebViewCookieJar : CookieJar {

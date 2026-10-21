@@ -29,6 +29,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.sailer.browser.lock.showSecure
 import com.sailer.browser.adblock.CosmeticFilter
 import com.sailer.browser.databinding.ItemMediaBinding
 import com.sailer.browser.databinding.SheetMediaBinding
@@ -231,7 +232,7 @@ class MainActivity : SecureActivity(),
             .setItems(titles) { _, which -> tabs.getOrNull(which)?.let { tabManager.select(it) } }
             .setPositiveButton(R.string.menu_new_tab) { _, _ -> tabManager.newTab(); focusAddressBar() }
             .setNegativeButton(R.string.close, null)
-            .show()
+            .showSecure()
     }
 
     private fun addBookmark() {
@@ -541,7 +542,7 @@ class MainActivity : SecureActivity(),
                     .setItems(arrayOf(getString(R.string.download_image), getString(R.string.open_new_tab))) { _, which ->
                         if (which == 0) startDownload(url, MediaKind.IMAGE) else tabManager.newTab(UrlUtils.fromUserInput(url))
                     }
-                    .show()
+                    .showSecure()
                 true
             }
             WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
@@ -554,7 +555,7 @@ class MainActivity : SecureActivity(),
                             startDownload(url, MediaSniffer.classify(url) ?: MediaKind.FILE)
                         }
                     }
-                    .show()
+                    .showSecure()
                 true
             }
             else -> false

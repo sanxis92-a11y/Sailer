@@ -16,7 +16,6 @@ class LockActivity : SecureActivity() {
     override val checksLock = false
 
     private lateinit var binding: ActivityLockBinding
-    private var failedAttempts = 0
 
     /** Modo "comprobar PIN" (p. ej. para abrir los favoritos) sin tocar el bloqueo general. */
     private val verifyOnly by lazy { intent.getBooleanExtra(EXTRA_VERIFY, false) }
@@ -52,31 +51,43 @@ class LockActivity : SecureActivity() {
     override fun onResume() {
         super.onResume()
         if (!verifyOnly && !AppLock.isLocked) finish()
+        showLockout()
     }
 
     private fun tryPin() {
+        if (AppLock.lockoutRemaining(this) > 0) {
+            showLockout()
+            return
+        }
         val pin = binding.pinField.text.toString()
         if (AppLock.checkPin(this, pin)) {
             unlock()
         } else {
-            failedAttempts++
             binding.pinField.text?.clear()
             binding.errorText.visibility = View.VISIBLE
             binding.errorText.setText(R.string.lock_wrong_pin)
-            if (failedAttempts >= 5) {
-                // Tras 5 fallos, esperar 30 segundos.
-                binding.unlockButton.isEnabled = false
-                binding.pinField.isEnabled = false
-                binding.errorText.setText(R.string.lock_wait)
-                binding.root.postDelayed({
-                    failedAttempts = 0
-                    binding.unlockButton.isEnabled = true
-                    binding.pinField.isEnabled = true
-                    binding.errorText.visibility = View.GONE
-                }, 30_000)
-            }
+            if (AppLock.lockoutRemaining(this) > 0) showLockout()
         }
     }
+
+    /** Tras varios fallos hay que esperar (el tiempo se guarda aunque cierres la app). */
+    private fun showLockout() {
+        val remaining = AppLock.lockoutRemaining(this)
+        if (remaining <= 0) {
+            binding.unlockButton.isEnabled = true
+            binding.pinField.isEnabled = true
+            binding.errorText.visibility = View.GONE
+            return
+        }
+        binding.unlockButton.isEnabled = false
+        binding.pinField.isEnabled = false
+        binding.errorText.visibility = View.VISIBLE
+        binding.errorText.text = getString(R.string.lock_wait_seconds, (remaining + 999) / 1000)
+        binding.root.removeCallbacks(lockoutTicker)
+        binding.root.postDelayed(lockoutTicker, 1000)
+    }
+
+    private val lockoutTicker = Runnable { showLockout() }
 
     private fun showBiometricPrompt() {
         val prompt = BiometricPrompt(
@@ -91,13 +102,13 @@ class LockActivity : SecureActivity() {
         val info = BiometricPrompt.PromptInfo.Builder()
             .setTitle(getString(R.string.lock_biometric_title))
             .setNegativeButtonText(getString(R.string.lock_use_pin))
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             .build()
         prompt.authenticate(info)
     }
 
     private fun unlock() {
-        if (verifyOnly) setResult(RESULT_OK) else AppLock.unlock()
+        if (verifyOnly) setResult(RESULT_OK) else AppLock.unlock(this)
         finish()
     }
 
@@ -106,6 +117,6 @@ class LockActivity : SecureActivity() {
 
         fun isBiometricAvailable(context: android.content.Context): Boolean =
             BiometricManager.from(context)
-                .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
+                .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
     }
 }

@@ -44,11 +44,14 @@ class Bookmarks private constructor(context: Context) {
     private fun load() {
         if (!file.exists()) return
         runCatching {
-            val json = JSONArray(String(vault.crypto.decryptBytes(file.readBytes()), Charsets.UTF_8))
+            val bytes = file.readBytes()
+            val json = JSONArray(String(vault.crypto.decryptBytes(bytes), Charsets.UTF_8))
             for (i in 0 until json.length()) {
                 val o = json.getJSONObject(i)
                 items.add(Bookmark(o.getString("id"), o.getString("title"), o.getString("url"), o.optLong("created")))
             }
+            // Pasar al cifrado nuevo si venía del formato antiguo.
+            if (vault.crypto.isLegacyBytes(bytes)) save()
         }
     }
 

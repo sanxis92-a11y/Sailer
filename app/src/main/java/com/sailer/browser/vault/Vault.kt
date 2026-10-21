@@ -12,6 +12,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArraySet
+import kotlin.concurrent.thread
 
 /**
  * Carpeta segura: archivos cifrados dentro del almacenamiento privado de la
@@ -46,6 +47,29 @@ class Vault private constructor(context: Context) {
         val known = entries.map { "${it.id}.bin" }.toSet()
         dir.listFiles()?.forEach { file ->
             if (file.name.endsWith(".bin") && file.name != indexFile.name && file.name !in known) file.delete()
+            if (file.name.endsWith(".mig")) file.delete()
+        }
+        thread(name = "vault-migrate") { migrateLegacyFiles() }
+    }
+
+    /**
+     * Pasa los archivos del formato antiguo (AES-CTR, versión 1.2 y anteriores)
+     * al nuevo (AES-GCM autenticado). Se hace una sola vez, en segundo plano.
+     */
+    private fun migrateLegacyFiles() {
+        if (indexFile.exists() && crypto.isLegacyBytes(indexFile.readBytes())) {
+            synchronized(this) { saveIndex() }
+        }
+        list().forEach { entry ->
+            val file = fileOf(entry)
+            if (!file.exists() || crypto.isV2(file)) return@forEach
+            val tmp = File(dir, "${entry.id}.mig")
+            runCatching {
+                crypto.decrypt(file).use { input ->
+                    crypto.encrypt(FileOutputStream(tmp).buffered(256 * 1024)).use { out -> input.copyTo(out, 256 * 1024) }
+                }
+                if (!tmp.renameTo(file)) throw java.io.IOException("No se pudo reemplazar")
+            }.onFailure { tmp.delete() }
         }
     }
 
@@ -55,7 +79,7 @@ class Vault private constructor(context: Context) {
 
     fun fileOf(entry: Entry): File = File(dir, "${entry.id}.bin")
 
-    fun openInput(entry: Entry): InputStream = crypto.decrypt(fileOf(entry).inputStream().buffered())
+    fun openInput(entry: Entry): InputStream = crypto.decrypt(fileOf(entry))
 
     /** Empieza a escribir un archivo nuevo cifrado. */
     fun newWriter(): Writer = Writer(UUID.randomUUID().toString())
@@ -64,9 +88,9 @@ class Vault private constructor(context: Context) {
         private val file = File(dir, "$id.bin")
         val output: OutputStream = crypto.encrypt(FileOutputStream(file).buffered(256 * 1024))
 
-        fun commit(name: String, kind: MediaKind, mime: String?): Entry {
+        fun commit(name: String, kind: MediaKind, mime: String?, created: Long = System.currentTimeMillis()): Entry {
             output.close()
-            val entry = Entry(id, name, kind, mime, file.length() - VaultCrypto.HEADER, System.currentTimeMillis())
+            val entry = Entry(id, name, kind, mime, crypto.plainLength(file), created)
             synchronized(this@Vault) {
                 entries.add(entry)
                 saveIndex()
@@ -89,7 +113,7 @@ class Vault private constructor(context: Context) {
             file.copyTo(target, overwrite = true)
             file.delete()
         }
-        val entry = Entry(id, name, kind, mime, target.length() - VaultCrypto.HEADER, System.currentTimeMillis())
+        val entry = Entry(id, name, kind, mime, crypto.plainLength(target), System.currentTimeMillis())
         synchronized(this) {
             entries.add(entry)
             saveIndex()

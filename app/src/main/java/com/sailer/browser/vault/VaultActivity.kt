@@ -12,6 +12,7 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.sailer.browser.lock.showSecure
 import com.sailer.browser.R
 import com.sailer.browser.databinding.ActivityVaultBinding
 import com.sailer.browser.databinding.ItemVaultBinding
@@ -93,7 +94,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                     .setNegativeButton(R.string.vault_cancel_download) { _, _ -> DownloadCenter.cancel(task) }
                     .setNeutralButton(R.string.close, null)
         }
-        builder.show()
+        builder.showSecure()
     }
 
     private fun showEntryOptions(entry: Vault.Entry) {
@@ -111,11 +112,14 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                     2 -> confirmDelete(entry)
                 }
             }
-            .show()
+            .showSecure()
     }
 
     private fun rename(entry: Vault.Entry) {
-        val field = EditText(this).apply { setText(entry.name) }
+        val field = EditText(this).apply {
+            setText(entry.name)
+            imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+        }
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.vault_rename)
             .setView(field)
@@ -124,7 +128,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 if (name.isNotEmpty()) vault.rename(entry, name)
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .showSecure()
     }
 
     private fun confirmExport(entry: Vault.Entry) {
@@ -133,11 +137,11 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             .setMessage(R.string.vault_export_warning)
             .setPositiveButton(R.string.vault_export) { _, _ ->
                 pendingExport = entry
-                AppLock.skipNextLock = true
+                AppLock.skipLockBriefly()
                 exportLauncher.launch(entry.name)
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .showSecure()
     }
 
     private fun export(entry: Vault.Entry, target: Uri) {
@@ -159,7 +163,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             .setMessage(getString(R.string.vault_delete_confirm, entry.name))
             .setPositiveButton(R.string.vault_delete) { _, _ -> vault.delete(entry) }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .showSecure()
     }
 
     private inner class Adapter : BaseAdapter() {

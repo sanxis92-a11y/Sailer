@@ -2,7 +2,7 @@
 
 Navegador Android personal, ligero y centrado en la privacidad, con descargador de vídeo, imágenes y audio.
 
-## Qué hace (versión 1.2)
+## Qué hace (versión 1.3)
 
 **Privacidad**
 - **Incógnito siempre**: al salir se borran cookies, caché, historial, formularios y almacenamiento de las webs. Si la app se cierra de golpe, se borra al volver a abrirla.
@@ -12,8 +12,8 @@ Navegador Android personal, ligero y centrado en la privacidad, con descargador 
 - **Bloqueo cosmético**: oculta los huecos y banners de anuncios dentro de las páginas (reglas de EasyList y EasyList Adult).
 - **Pop-ups**: solo se abre una pestaña nueva si tocas un enlace que lleva justo ahí; la publicidad que se abre al tocar en cualquier sitio se descarta.
 - Si una web no funciona bien, puedes desactivar el bloqueador solo en esa web desde el menú ⋮.
-- **Bloqueo con PIN o huella** al abrir la app y cada vez que vuelves a ella.
-- **DNS cifrado** (DNS over HTTPS) en las descargas, y guía para activar el DNS privado de Android para todo el móvil.
+- **Bloqueo con PIN o huella** al abrir la app y cada vez que vuelves a ella. El PIN se guarda atado al chip de seguridad del móvil (no se puede adivinar copiando los datos) y tras 5 fallos hay que esperar cada vez más.
+- **DNS cifrado** (DNS over HTTPS) en las páginas y en las descargas, y guía para activar el DNS privado de Android para todo el móvil.
 - **Favoritos privados**, cifrados y protegidos con tu PIN.
 - **Disimulo opcional**: icono y nombre de «Calculadora» (Ajustes).
 - Sin ubicación, cámara ni micrófono para las webs, sin copias de seguridad en la nube y sin enviar datos a Google.
@@ -24,7 +24,8 @@ Navegador Android personal, ligero y centrado en la privacidad, con descargador 
 - **Pausar y reanudar** descargas (desde la carpeta segura o la notificación). Si se corta internet, se reintentan solas y siguen donde iban.
 - Mantén pulsada una **imagen** o un **enlace** para descargarlo.
 - Los vídeos con **DRM** (Netflix, etc.) no se pueden descargar.
-- Todo se guarda en la **carpeta segura**: cifrada (AES-256) y oculta de la galería. Desde ahí puedes ver, renombrar, borrar o exportar.
+- Todo se guarda en la **carpeta segura**: cifrada (AES-256-GCM, que además detecta si alguien ha tocado los archivos) y oculta de la galería. Desde ahí puedes ver, renombrar, borrar o exportar.
+- **Copia de seguridad cifrada** con contraseña (Ajustes): guarda la carpeta segura y los favoritos en un archivo para reinstalar o cambiar de móvil.
 
 ## Cómo instalarlo en el móvil
 
@@ -42,8 +43,8 @@ Después, abre el `.apk` en el móvil. Android pedirá permiso para "instalar ap
 - Si el móvil no sabe unir un formato concreto de audio y vídeo, se guardan como dos archivos.
 - Al unir audio y vídeo, el resultado existe sin cifrar unos segundos dentro del almacenamiento privado de la app antes de cifrarse.
 - Una descarga en pausa se pierde si Android cierra la app por completo.
-- El DNS cifrado de la app solo afecta a las descargas: para las páginas, activa el DNS privado de Android (Ajustes de Sailer → "DNS cifrado para todo el móvil").
-- El APK se firma con una clave incluida en el repositorio (cómodo para uso personal, no apto para publicar en tiendas).
+- El DNS cifrado de las páginas necesita un WebView reciente (Android System WebView actualizado desde Play Store).
+- Si no se configura una clave privada en los *secrets* de GitHub (`SAILER_KEYSTORE_BASE64`, `SAILER_KEYSTORE_PASSWORD`, `SAILER_KEY_ALIAS`), el APK se firma con la clave de depuración incluida en el repositorio. Cambiar de clave obliga a desinstalar: haz antes una copia de seguridad.
 
 ## Estructura del código
 

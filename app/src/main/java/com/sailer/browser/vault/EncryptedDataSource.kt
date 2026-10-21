@@ -23,7 +23,7 @@ class EncryptedDataSource(private val crypto: VaultCrypto) : BaseDataSource(fals
         uri = dataSpec.uri
         transferInitializing(dataSpec)
         val file = File(dataSpec.uri.path ?: throw IOException("Ruta no válida"))
-        val plainLength = file.length() - VaultCrypto.HEADER
+        val plainLength = crypto.plainLength(file)
         if (dataSpec.position > plainLength) throw IOException("Posición fuera del archivo")
         input = crypto.decryptFrom(file, dataSpec.position)
         val available = plainLength - dataSpec.position

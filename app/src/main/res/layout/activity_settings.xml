@@ -76,6 +76,25 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/settings_change_pin" />
 
+            <TextView style="@style/SailerSectionTitle" android:text="@string/backup_section" />
+
+            <TextView style="@style/SailerHint" android:text="@string/backup_help" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/backupExport"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/backup_export" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/backupImport"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/backup_import" />
+
             <TextView
                 android:id="@+id/version"
                 style="@style/SailerHint"

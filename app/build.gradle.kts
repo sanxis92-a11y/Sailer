@@ -11,19 +11,30 @@ android {
         applicationId = "com.sailer.browser"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.3.0"
     }
 
     signingConfigs {
         // Clave de depuración fija (incluida en el repo) para que cada APK
         // compilado en GitHub se pueda instalar encima del anterior.
-        // No es secreta: la versión final (paso 4) usará otra clave privada.
+        // No es secreta: solo se usa si no hay clave privada configurada.
         getByName("debug") {
             storeFile = file("debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
+        }
+        // Clave privada: GitHub la pasa desde sus "secrets" al compilar
+        // (nunca se guarda en el repositorio).
+        val releaseStore = System.getenv("SAILER_KEYSTORE_FILE")
+        if (!releaseStore.isNullOrBlank() && file(releaseStore).exists()) {
+            create("release") {
+                storeFile = file(releaseStore)
+                storePassword = System.getenv("SAILER_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SAILER_KEY_ALIAS") ?: "sailer"
+                keyPassword = System.getenv("SAILER_KEY_PASSWORD") ?: System.getenv("SAILER_KEYSTORE_PASSWORD")
+            }
         }
     }
 
@@ -32,8 +43,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            // Misma clave para poder instalar encima de versiones anteriores.
-            signingConfig = signingConfigs.getByName("debug")
+            // Clave privada si está configurada; si no, la de depuración.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
