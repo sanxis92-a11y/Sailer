@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Sailer.SectionTitle">
+    <style name="SailerSectionTitle">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_marginTop">20dp</item>
@@ -11,7 +11,7 @@
         <item name="android:textAllCaps">true</item>
     </style>
 
-    <style name="Sailer.Switch">
+    <style name="SailerSwitch">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:minHeight">56dp</item>
@@ -19,7 +19,7 @@
         <item name="android:textSize">16sp</item>
     </style>
 
-    <style name="Sailer.Hint">
+    <style name="SailerHint">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">@color/text_dim</item>

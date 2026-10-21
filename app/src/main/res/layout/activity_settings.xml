@@ -25,21 +25,21 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <TextView style="@style/Sailer.SectionTitle" android:text="@string/settings_section_privacy" />
+            <TextView style="@style/SailerSectionTitle" android:text="@string/settings_section_privacy" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switchAdblock"
-                style="@style/Sailer.Switch"
+                style="@style/SailerSwitch"
                 android:text="@string/settings_adblock" />
 
-            <TextView style="@style/Sailer.Hint" android:text="@string/settings_adblock_help" />
+            <TextView style="@style/SailerHint" android:text="@string/settings_adblock_help" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switchDoh"
-                style="@style/Sailer.Switch"
+                style="@style/SailerSwitch"
                 android:text="@string/settings_doh" />
 
-            <TextView style="@style/Sailer.Hint" android:text="@string/settings_doh_help" />
+            <TextView style="@style/SailerHint" android:text="@string/settings_doh_help" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/privateDns"
@@ -49,16 +49,16 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/settings_private_dns" />
 
-            <TextView style="@style/Sailer.SectionTitle" android:text="@string/settings_section_lock" />
+            <TextView style="@style/SailerSectionTitle" android:text="@string/settings_section_lock" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switchLock"
-                style="@style/Sailer.Switch"
+                style="@style/SailerSwitch"
                 android:text="@string/settings_lock" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switchBiometric"
-                style="@style/Sailer.Switch"
+                style="@style/SailerSwitch"
                 android:text="@string/settings_biometric" />
 
             <com.google.android.material.button.MaterialButton
@@ -71,7 +71,7 @@
 
             <TextView
                 android:id="@+id/version"
-                style="@style/Sailer.Hint"
+                style="@style/SailerHint"
                 android:layout_marginTop="32dp"
                 android:gravity="center" />
         </LinearLayout>
