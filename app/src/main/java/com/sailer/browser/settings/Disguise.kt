@@ -9,7 +9,7 @@ import com.sailer.browser.R
 /**
  * Disimulo opcional: cambia el icono y el nombre de la app por los de una
  * "Calculadora" que funciona de verdad (lock/CalculatorScreen); el PIN + «=»
- * abre Sailer. Se hace con dos accesos directos (activity-alias) y se activa
+ * abre Nauvel. Se hace con dos accesos directos (activity-alias) y se activa
  * uno u otro.
  */
 object Disguise {

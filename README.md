@@ -1,4 +1,4 @@
-# Sailer
+# Nauvel
 
 Navegador Android personal, ligero y centrado en la privacidad, con descargador de vídeo, imágenes y audio.
 
@@ -29,11 +29,11 @@ Navegador Android personal, ligero y centrado en la privacidad, con descargador 
 
 ## Cómo instalarlo en el móvil
 
-**Opción fácil (después de aprobar el PR):** en GitHub entra en **Releases** (columna derecha de la página del repositorio), abre la más reciente y descarga `Sailer-x.x.x.apk`.
+**Opción fácil (después de aprobar el PR):** en GitHub entra en **Releases** (columna derecha de la página del repositorio), abre la más reciente y descarga `Nauvel-x.x.x.apk`.
 
 **Opción desde Actions:**
 1. Abre la pestaña **Actions**, entra en la ejecución más reciente de **Compilar APK** con el círculo verde ✅.
-2. En **Artifacts** descarga **Sailer-apk** (un .zip). Dentro está `Sailer-x.x.x.apk`.
+2. En **Artifacts** descarga **Nauvel-apk** (un .zip). Dentro está `Nauvel-x.x.x.apk`.
 
 Después, abre el `.apk` en el móvil. Android pedirá permiso para "instalar apps desconocidas" desde esa app: acéptalo y pulsa **Instalar**. Las versiones nuevas se instalan encima sin perder la carpeta segura.
 
@@ -67,4 +67,4 @@ Las listas de bloqueo se generan con `python3 tools/build_blocklists.py` a parti
 
 ## Licencia
 
-Sailer es software libre bajo la [GNU GPL v3.0](LICENSE). Política de privacidad: [docs/privacidad.html](docs/privacidad.html).
+Nauvel es software libre bajo la [GNU GPL v3.0](LICENSE). Política de privacidad: [docs/privacidad.html](docs/privacidad.html).

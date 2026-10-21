@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Idiomas que se pueden elegir para Sailer en Ajustes del móvil (Android 13+). -->
+<!-- Idiomas que se pueden elegir para Nauvel en Ajustes del móvil (Android 13+). -->
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">
     <locale android:name="en" />
     <locale android:name="es" />

@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Sailer"
+rootProject.name = "Nauvel"
 include(":app")

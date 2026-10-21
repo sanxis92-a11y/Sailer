@@ -1,6 +1,6 @@
-Sailer is free software under the GNU GPL v3.0. Its source code is at https://github.com/sanxis92-a11y/sailer
+Nauvel is free software under the GNU GPL v3.0. Its source code is at https://github.com/sanxis92-a11y/sailer
 
-Sailer uses these third-party libraries and lists. Thanks to their authors.
+Nauvel uses these third-party libraries and lists. Thanks to their authors.
 
 LIBRARIES
 • AndroidX (Core, AppCompat, Activity, WebKit, Biometric, Lifecycle, Media3) — The Android Open Source Project — Apache License 2.0

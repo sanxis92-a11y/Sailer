@@ -8,7 +8,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.sailer.browser"
+        applicationId = "com.nauvel.browser"
         minSdk = 26
         targetSdk = 36
         versionCode = 6
@@ -23,12 +23,13 @@ android {
     productFlavors {
         create("full") {
             dimension = "store"
+            // Nombre distinto al de Play para que las dos versiones puedan convivir.
+            applicationIdSuffix = ".full"
             buildConfigField("boolean", "STREAM_DOWNLOADS", "true")
             buildConfigField("boolean", "DISGUISE", "true")
         }
         create("play") {
             dimension = "store"
-            applicationIdSuffix = ".play"
             // Descargador incluido, pero con webs bloqueadas (ver media/StorePolicy).
             buildConfigField("boolean", "STREAM_DOWNLOADS", "true")
             // Disimulo con calculadora funcional. Si Google lo rechazara, poner "false"

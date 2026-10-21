@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Sailer</string>
+    <string name="app_name">Nauvel</string>
     <string name="calculator_name">Calculadora</string>
     <string name="address_hint">Buscar o escribir dirección</string>
     <string name="menu_more">Más opciones</string>
@@ -42,7 +42,7 @@
     <string name="download_image">Descargar imagen</string>
     <string name="download_link">Descargar enlace</string>
     <string name="open_new_tab">Abrir en pestaña nueva</string>
-    <string name="media_not_allowed">Esta web no permite descargar sus vídeos desde Sailer.</string>
+    <string name="media_not_allowed">Esta web no permite descargar sus vídeos desde Nauvel.</string>
     <string name="download_notice_title">Antes de descargar</string>
     <string name="download_notice">Descarga solo contenido propio, libre o que tengas permiso para guardar. Respeta los derechos de autor y las condiciones de cada web.\n\nLos vídeos protegidos (DRM) y los de algunas plataformas no se pueden descargar.</string>
     <string name="download_notice_ok">Entendido</string>
@@ -81,13 +81,13 @@
     <string name="viewer_error">No se puede abrir este archivo</string>
 
     <!-- Bloqueo -->
-    <string name="lock_title">Sailer está bloqueado</string>
+    <string name="lock_title">Nauvel está bloqueado</string>
     <string name="lock_subtitle">Escribe tu PIN para continuar</string>
     <string name="lock_hint">PIN</string>
     <string name="lock_unlock">Desbloquear</string>
     <string name="lock_use_biometric">Usar huella</string>
     <string name="lock_use_pin">Usar PIN</string>
-    <string name="lock_biometric_title">Desbloquear Sailer</string>
+    <string name="lock_biometric_title">Desbloquear Nauvel</string>
     <string name="lock_wrong_pin">PIN incorrecto</string>
     <string name="lock_wait_seconds">Demasiados intentos. Espera %d segundos.</string>
 
@@ -102,9 +102,9 @@
     <string name="settings_open_settings">Abrir ajustes</string>
     <string name="settings_section_lock">Bloqueo</string>
     <string name="settings_disguise">Disimular como «Calculadora»</string>
-    <string name="settings_disguise_help">El icono y el nombre pasan a ser los de una calculadora que funciona de verdad. Para entrar en Sailer, escribe tu PIN en la calculadora y pulsa «=». Necesita tener un PIN.</string>
+    <string name="settings_disguise_help">El icono y el nombre pasan a ser los de una calculadora que funciona de verdad. Para entrar en Nauvel, escribe tu PIN en la calculadora y pulsa «=». Necesita tener un PIN.</string>
     <string name="settings_disguise_how">Listo. A partir de ahora, al abrir la app verás una calculadora normal.\n\nPara entrar: escribe tu PIN y pulsa «=».\nCon la huella activada: mantén pulsado «=».\n\nEl icono puede tardar unos segundos en cambiar y quizá tengas que volver a ponerlo en la pantalla de inicio.</string>
-    <string name="settings_lock">Pedir PIN al abrir Sailer</string>
+    <string name="settings_lock">Pedir PIN al abrir Nauvel</string>
     <string name="settings_biometric">Permitir desbloquear con huella</string>
     <string name="settings_change_pin">Cambiar PIN</string>
     <string name="settings_pin_title">Elige un PIN</string>
@@ -116,11 +116,11 @@
     <string name="settings_section_about">Información</string>
     <string name="settings_privacy_policy">Política de privacidad</string>
     <string name="settings_licenses">Licencias de código abierto</string>
-    <string name="settings_version">Sailer %s</string>
+    <string name="settings_version">Nauvel %s</string>
 
     <!-- Copia de seguridad -->
     <string name="backup_section">Copia de seguridad</string>
-    <string name="backup_help">Guarda la carpeta segura y los favoritos en un único archivo protegido con una contraseña. Úsalo antes de reinstalar Sailer o para pasarlo a otro móvil.</string>
+    <string name="backup_help">Guarda la carpeta segura y los favoritos en un único archivo protegido con una contraseña. Úsalo antes de reinstalar Nauvel o para pasarlo a otro móvil.</string>
     <string name="backup_export">Exportar copia cifrada</string>
     <string name="backup_import">Importar copia</string>
     <string name="backup_password_title">Contraseña de la copia</string>

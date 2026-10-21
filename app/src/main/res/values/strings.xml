@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- English (default). Spanish is in values-es/strings.xml. -->
 <resources>
-    <string name="app_name">Sailer</string>
+    <string name="app_name">Nauvel</string>
     <string name="calculator_name">Calculator</string>
     <string name="address_hint">Search or type a web address</string>
     <string name="menu_more">More options</string>
@@ -43,7 +43,7 @@
     <string name="download_image">Download image</string>
     <string name="download_link">Download link</string>
     <string name="open_new_tab">Open in new tab</string>
-    <string name="media_not_allowed">This site doesn\'t allow its videos to be downloaded with Sailer.</string>
+    <string name="media_not_allowed">This site doesn\'t allow its videos to be downloaded with Nauvel.</string>
     <string name="download_notice_title">Before you download</string>
     <string name="download_notice">Only download content you own, that is free to use, or that you have permission to save. Respect copyright and each site\'s terms.\n\nDRM-protected videos and those from some platforms can\'t be downloaded.</string>
     <string name="download_notice_ok">Got it</string>
@@ -82,13 +82,13 @@
     <string name="viewer_error">This file can\'t be opened</string>
 
     <!-- Lock -->
-    <string name="lock_title">Sailer is locked</string>
+    <string name="lock_title">Nauvel is locked</string>
     <string name="lock_subtitle">Enter your PIN to continue</string>
     <string name="lock_hint">PIN</string>
     <string name="lock_unlock">Unlock</string>
     <string name="lock_use_biometric">Use fingerprint</string>
     <string name="lock_use_pin">Use PIN</string>
-    <string name="lock_biometric_title">Unlock Sailer</string>
+    <string name="lock_biometric_title">Unlock Nauvel</string>
     <string name="lock_wrong_pin">Wrong PIN</string>
     <string name="lock_wait_seconds">Too many attempts. Wait %d seconds.</string>
 
@@ -103,9 +103,9 @@
     <string name="settings_open_settings">Open settings</string>
     <string name="settings_section_lock">Lock</string>
     <string name="settings_disguise">Disguise as “Calculator”</string>
-    <string name="settings_disguise_help">The icon and name become those of a calculator that really works. To open Sailer, type your PIN in the calculator and press “=”. Requires a PIN.</string>
+    <string name="settings_disguise_help">The icon and name become those of a calculator that really works. To open Nauvel, type your PIN in the calculator and press “=”. Requires a PIN.</string>
     <string name="settings_disguise_how">Done. From now on the app opens as a normal calculator.\n\nTo get in: type your PIN and press “=”.\nWith fingerprint on: press and hold “=”.\n\nThe icon may take a few seconds to change, and you may need to add it to your home screen again.</string>
-    <string name="settings_lock">Ask for PIN when opening Sailer</string>
+    <string name="settings_lock">Ask for PIN when opening Nauvel</string>
     <string name="settings_biometric">Allow fingerprint unlock</string>
     <string name="settings_change_pin">Change PIN</string>
     <string name="settings_pin_title">Choose a PIN</string>
@@ -117,11 +117,11 @@
     <string name="settings_section_about">About</string>
     <string name="settings_privacy_policy">Privacy policy</string>
     <string name="settings_licenses">Open source licenses</string>
-    <string name="settings_version">Sailer %s</string>
+    <string name="settings_version">Nauvel %s</string>
 
     <!-- Backup -->
     <string name="backup_section">Backup</string>
-    <string name="backup_help">Saves the secure folder and bookmarks into a single password-protected file. Use it before reinstalling Sailer or to move to another phone.</string>
+    <string name="backup_help">Saves the secure folder and bookmarks into a single password-protected file. Use it before reinstalling Nauvel or to move to another phone.</string>
     <string name="backup_export">Export encrypted backup</string>
     <string name="backup_import">Import backup</string>
     <string name="backup_password_title">Backup password</string>

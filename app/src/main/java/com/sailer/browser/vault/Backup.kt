@@ -80,14 +80,14 @@ object Backup {
         try {
             DataInputStream(source).readFully(header)
         } catch (e: EOFException) {
-            throw IOException(Lang.t("No es una copia de Sailer", "Not a Sailer backup"))
+            throw IOException(Lang.t("No es una copia de Nauvel", "Not a Nauvel backup"))
         }
         val buffer = ByteBuffer.wrap(header)
         val magic = ByteArray(MAGIC.size).also { buffer.get(it) }
-        if (!magic.contentEquals(MAGIC)) throw IOException(Lang.t("No es una copia de Sailer", "Not a Sailer backup"))
+        if (!magic.contentEquals(MAGIC)) throw IOException(Lang.t("No es una copia de Nauvel", "Not a Nauvel backup"))
         val salt = ByteArray(16).also { buffer.get(it) }
         val iterations = buffer.int
-        if (iterations !in 10_000..10_000_000) throw IOException(Lang.t("No es una copia de Sailer", "Not a Sailer backup"))
+        if (iterations !in 10_000..10_000_000) throw IOException(Lang.t("No es una copia de Nauvel", "Not a Nauvel backup"))
         val key = deriveKey(password, salt, iterations)
 
         val vault = Vault.get(context)

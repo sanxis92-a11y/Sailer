@@ -108,7 +108,7 @@ class SettingsActivity : SecureActivity() {
         binding.backupExport.setOnClickListener {
             AppLock.skipLockBriefly()
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-            exportLauncher.launch("sailer-copia-$date.sailer")
+            exportLauncher.launch(Lang.t("nauvel-copia-$date.nauvel", "nauvel-backup-$date.nauvel"))
         }
         binding.backupImport.setOnClickListener {
             AppLock.skipLockBriefly()

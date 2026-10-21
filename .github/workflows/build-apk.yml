@@ -45,22 +45,22 @@ jobs:
         run: |
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          cp app/build/outputs/apk/full/release/app-full-release.apk "Sailer-$VERSION.apk"
-          cp app/build/outputs/bundle/playRelease/app-play-release.aab "Sailer-Play-$VERSION.aab"
+          cp app/build/outputs/apk/full/release/app-full-release.apk "Nauvel-$VERSION.apk"
+          cp app/build/outputs/bundle/playRelease/app-play-release.aab "Nauvel-Play-$VERSION.aab"
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: Sailer-apk
-          path: Sailer-*.apk
+          name: Nauvel-apk
+          path: Nauvel-*.apk
           retention-days: 30
 
       # Este es el archivo que se sube a Google Play Console.
       - name: Subir AAB de Google Play
         uses: actions/upload-artifact@v4
         with:
-          name: Sailer-play-aab
-          path: Sailer-Play-*.aab
+          name: Nauvel-play-aab
+          path: Nauvel-Play-*.aab
           retention-days: 30
 
       # En la rama principal, publicar también una "Release" para descargarla fácil.
@@ -69,6 +69,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}-${{ github.run_number }}
-          name: Sailer ${{ env.VERSION }} (compilación ${{ github.run_number }})
-          files: Sailer-*.apk
+          name: Nauvel ${{ env.VERSION }} (compilación ${{ github.run_number }})
+          files: Nauvel-*.apk
           make_latest: true
