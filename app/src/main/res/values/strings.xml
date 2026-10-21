@@ -98,7 +98,8 @@
     <string name="settings_open_settings">Abrir ajustes</string>
     <string name="settings_section_lock">Bloqueo</string>
     <string name="settings_disguise">Disimular como «Calculadora»</string>
-    <string name="settings_disguise_help">Cambia el icono y el nombre de la app. El icono puede tardar unos segundos en cambiar y quizá tengas que volver a ponerlo en la pantalla de inicio.</string>
+    <string name="settings_disguise_help">El icono y el nombre pasan a ser los de una calculadora que funciona de verdad. Para entrar en Sailer, escribe tu PIN en la calculadora y pulsa «=». Necesita tener un PIN.</string>
+    <string name="settings_disguise_how">Listo. A partir de ahora, al abrir la app verás una calculadora normal.\n\nPara entrar: escribe tu PIN y pulsa «=».\nCon la huella activada: mantén pulsado «=».\n\nEl icono puede tardar unos segundos en cambiar y quizá tengas que volver a ponerlo en la pantalla de inicio.</string>
     <string name="settings_lock">Pedir PIN al abrir Sailer</string>
     <string name="settings_biometric">Permitir desbloquear con huella</string>
     <string name="settings_change_pin">Cambiar PIN</string>

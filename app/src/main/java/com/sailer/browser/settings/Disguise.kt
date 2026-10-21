@@ -7,15 +7,16 @@ import com.sailer.browser.BuildConfig
 
 /**
  * Disimulo opcional: cambia el icono y el nombre de la app por los de una
- * "Calculadora". Se hace con dos accesos directos (activity-alias) y se
- * activa uno u otro.
+ * "Calculadora" que funciona de verdad (lock/CalculatorScreen); el PIN + «=»
+ * abre Sailer. Se hace con dos accesos directos (activity-alias) y se activa
+ * uno u otro.
  */
 object Disguise {
 
     private const val NORMAL = "com.sailer.browser.LauncherNormal"
     private const val CALCULATOR = "com.sailer.browser.LauncherCalculator"
 
-    /** La versión de Google Play no lleva disimulo (su manifiesto no tiene el icono). */
+    /** Se puede desactivar por versión con BuildConfig.DISGUISE. */
     val isAvailable get() = BuildConfig.DISGUISE
 
     fun isEnabled(context: Context): Boolean =

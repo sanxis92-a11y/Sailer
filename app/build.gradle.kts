@@ -17,8 +17,8 @@ android {
 
     // Dos versiones de la app:
     //  - full: la completa, para instalar desde GitHub (APK).
-    //  - play: la de Google Play. Sin disimulo de icono, sin descargas de
-    //    YouTube ni plataformas de pago y con aviso de derechos de autor.
+    //  - play: la de Google Play. Sin descargas de YouTube ni plataformas
+    //    de pago y con aviso de derechos de autor.
     flavorDimensions += "store"
     productFlavors {
         create("full") {
@@ -31,7 +31,9 @@ android {
             applicationIdSuffix = ".play"
             // Descargador incluido, pero con webs bloqueadas (ver media/StorePolicy).
             buildConfigField("boolean", "STREAM_DOWNLOADS", "true")
-            buildConfigField("boolean", "DISGUISE", "false")
+            // Disimulo con calculadora funcional. Si Google lo rechazara, poner "false"
+            // y quitar el icono .LauncherCalculator en src/play/AndroidManifest.xml.
+            buildConfigField("boolean", "DISGUISE", "true")
         }
     }
 

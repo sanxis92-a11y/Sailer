@@ -65,11 +65,27 @@ class SettingsActivity : SecureActivity() {
             binding.disguiseHelp.visibility = View.GONE
         }
         binding.switchDisguise.isChecked = Disguise.isEnabled(this)
-        binding.switchDisguise.setOnCheckedChangeListener { _, checked -> Disguise.setEnabled(this, checked) }
+        binding.switchDisguise.setOnCheckedChangeListener { _, checked ->
+            if (checked && !AppLock.isConfigured(this)) {
+                // La calculadora se abre con el PIN, así que primero hay que elegir uno.
+                askNewPin(onCancel = { binding.switchDisguise.isChecked = false }) {
+                    prefs.lockEnabled = true
+                    binding.switchLock.isChecked = true
+                    updateLockViews()
+                    enableDisguise()
+                }
+            } else if (checked) {
+                enableDisguise()
+            } else {
+                Disguise.setEnabled(this, false)
+            }
+        }
 
         binding.switchLock.isChecked = AppLock.isConfigured(this)
         binding.switchLock.setOnCheckedChangeListener { _, checked ->
-            if (checked) {
+            if (checked && AppLock.isConfigured(this)) {
+                updateLockViews()
+            } else if (checked) {
                 askNewPin(onCancel = { binding.switchLock.isChecked = false }) {
                     prefs.lockEnabled = true
                     updateLockViews()
@@ -77,6 +93,8 @@ class SettingsActivity : SecureActivity() {
             } else {
                 prefs.lockEnabled = false
                 prefs.biometricEnabled = false
+                // Sin PIN no se podría salir de la calculadora.
+                binding.switchDisguise.isChecked = false
                 updateLockViews()
             }
         }
@@ -99,6 +117,15 @@ class SettingsActivity : SecureActivity() {
         binding.licenses.setOnClickListener { showTextAsset(R.string.settings_licenses, "licenses.txt") }
         binding.version.text = getString(R.string.settings_version, BuildConfig.VERSION_NAME)
         updateLockViews()
+    }
+
+    private fun enableDisguise() {
+        Disguise.setEnabled(this, true)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.settings_disguise)
+            .setMessage(R.string.settings_disguise_how)
+            .setPositiveButton(R.string.download_notice_ok, null)
+            .showSecure()
     }
 
     /** Muestra un texto largo guardado en assets (política de privacidad, licencias). */
