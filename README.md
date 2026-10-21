@@ -64,3 +64,7 @@ app/src/main/java/com/sailer/browser/
 ```
 
 Las listas de bloqueo se generan con `python3 tools/build_blocklists.py` a partir de [HaGeZi](https://github.com/hagezi/dns-blocklists) (GPL-3.0) y [EasyList](https://easylist.to) (GPL-3.0 / CC BY-SA 3.0). Vuelve a ejecutarlo de vez en cuando para actualizarlas.
+
+## Licencia
+
+Sailer es software libre bajo la [GNU GPL v3.0](LICENSE). Política de privacidad: [docs/privacidad.html](docs/privacidad.html).

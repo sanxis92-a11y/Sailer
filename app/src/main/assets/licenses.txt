@@ -1,3 +1,5 @@
+Sailer es software libre con licencia GNU GPL v3.0. Su código está en https://github.com/sanxis92-a11y/sailer
+
 Sailer usa estas bibliotecas y listas de terceros. Gracias a sus autores.
 
 BIBLIOTECAS
