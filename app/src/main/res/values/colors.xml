@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#FF121417</color>
-    <color name="surface">#FF1E2126</color>
-    <color name="field">#FF2A2E35</color>
-    <color name="text">#FFE8EAED</color>
-    <color name="text_dim">#FF9AA0A6</color>
-    <color name="accent">#FF7C5CFF</color>
+    <!-- Paleta oscura de Sailer -->
+    <color name="bg">#FF0E1014</color>
+    <color name="surface">#FF16191F</color>
+    <color name="surface_high">#FF1E222A</color>
+    <color name="field">#FF262B34</color>
+    <color name="stroke">#FF2F3541</color>
+    <color name="text">#FFECEEF2</color>
+    <color name="text_dim">#FF9AA3B0</color>
+    <color name="accent">#FF8B7BFF</color>
+    <color name="accent_dark">#FF5B45E0</color>
+    <color name="accent_container">#FF2C2650</color>
+    <color name="on_accent_container">#FFE3DDFF</color>
+    <color name="danger">#FFFF6B6B</color>
     <color name="calculator_bg">#FF607D8B</color>
+    <color name="launcher_bg_start">#FF6D5BFF</color>
+    <color name="launcher_bg_end">#FF2A1F8F</color>
 </resources>

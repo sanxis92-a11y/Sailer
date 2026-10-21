@@ -1,0 +1,24 @@
+Sailer does not collect, store or send any personal data to its creators. There are no accounts, no ads, no usage statistics and no tracking.
+
+What stays on your phone
+• History, tabs, cookies and cache are erased when you close the app or tap "Erase everything and exit".
+• Downloads and bookmarks are stored encrypted inside the app. They only leave it if you export them.
+• The PIN is stored in protected form (never as readable text), and fingerprint unlock is handled by Android: Sailer never sees it.
+• A backup is only created if you ask for it, in the place you choose, encrypted with your password.
+
+What goes out to the internet
+• The websites you visit receive your requests, as with any browser.
+• Searches you type in the address bar are sent to DuckDuckGo.
+• If "Encrypted DNS" is on, the names of the sites you visit are looked up over an encrypted connection with Cloudflare (1.1.1.1) instead of your carrier. You can turn it off in Settings.
+• Sailer turns off Google Safe Browsing and WebView statistics so the addresses you visit are not sent to Google.
+
+Permissions
+• Internet: to load websites.
+• Notifications: to show download progress.
+• Fingerprint or face: only if you turn on biometric unlock.
+
+Children
+Sailer is not intended for anyone under 18.
+
+Changes and contact
+If this policy changes, it will be updated in the app and on the Google Play listing. For any questions, write to the contact email shown on the app's listing.

@@ -1,5 +1,6 @@
 package com.sailer.browser.download
 
+import com.sailer.browser.Lang
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import java.io.IOException
@@ -41,7 +42,7 @@ class DashManifest private constructor(
     /** Plan para una calidad de vídeo (o la mejor) más el mejor audio compatible. */
     fun plan(videoId: String?): Plan {
         if (hasDrm) throw HlsDownloader.DrmException()
-        if (isLive) throw IOException("Las emisiones en directo no se pueden descargar")
+        if (isLive) throw IOException(Lang.t("Las emisiones en directo no se pueden descargar", "Live streams can't be downloaded"))
         val video = videos.firstOrNull { it.id == videoId } ?: videos.firstOrNull()
         val sameFamily = audios.filter { (it.extension == "weba") == (video?.extension == "webm") }
         val audio = sameFamily.firstOrNull() ?: audios.firstOrNull()
@@ -51,7 +52,7 @@ class DashManifest private constructor(
                 audio?.let { TrackPlan(it.pieces, it.extension) },
             )
             audio != null -> Plan(TrackPlan(audio.pieces, audio.extension))
-            else -> throw IOException("El manifiesto no tiene vídeo ni audio")
+            else -> throw IOException(Lang.t("El manifiesto no tiene vídeo ni audio", "The manifest has no video or audio"))
         }
     }
 

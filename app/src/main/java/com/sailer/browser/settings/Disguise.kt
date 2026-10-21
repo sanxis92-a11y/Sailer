@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import com.sailer.browser.BuildConfig
+import com.sailer.browser.R
 
 /**
  * Disimulo opcional: cambia el icono y el nombre de la app por los de una
@@ -42,5 +43,5 @@ object Disguise {
 
     /** Nombre que se muestra (notificaciones, apps recientes). */
     fun label(context: Context): String =
-        if (isEnabled(context)) "Calculadora" else "Sailer"
+        context.getString(if (isEnabled(context)) R.string.calculator_name else R.string.app_name)
 }

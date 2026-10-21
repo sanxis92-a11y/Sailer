@@ -1,5 +1,6 @@
 package com.sailer.browser.download
 
+import com.sailer.browser.Lang
 import android.content.Context
 import android.util.Base64
 import android.webkit.MimeTypeMap
@@ -86,13 +87,13 @@ class Downloader(private val context: Context) {
             if (response.code == 416 && already > 0) {
                 // Ya estaba completo.
             } else {
-                if (!response.isSuccessful) throw IOException("Error del servidor (${response.code})")
+                if (!response.isSuccessful) throw IOException(Lang.t("Error del servidor (${response.code})", "Server error (${response.code})"))
                 if (response.code != 206 && already > 0) {
                     // El servidor no permite reanudar: empezar de cero.
                     part.delete()
                     already = 0
                 }
-                val body = response.body ?: throw IOException("Respuesta vacía")
+                val body = response.body ?: throw IOException(Lang.t("Respuesta vacía", "Empty response"))
                 body.contentType()?.let { "${it.type}/${it.subtype}" }
                     ?.takeUnless { it == "application/octet-stream" }
                     ?.let { state.mime = it }
@@ -171,7 +172,7 @@ class Downloader(private val context: Context) {
             // Si no se pueden unir (formato raro), se guardan las dos pistas por separado.
             muxed.delete()
             vault.adopt(audioPart, fileName(request, audio.extension, " (audio)"), MediaKind.AUDIO, mimeFor(audio.extension))
-            vault.adopt(videoPart, fileName(request, plan.video.extension, " (vídeo)"), MediaKind.VIDEO, mimeFor(plan.video.extension))
+            vault.adopt(videoPart, fileName(request, plan.video.extension, Lang.t(" (vídeo)", " (video)")), MediaKind.VIDEO, mimeFor(plan.video.extension))
         } finally {
             muxed.delete()
         }
@@ -231,14 +232,14 @@ class Downloader(private val context: Context) {
         repeat(3) {
             try {
                 client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) throw IOException("Error del servidor (${response.code})")
-                    return response.body?.bytes() ?: throw IOException("Respuesta vacía")
+                    if (!response.isSuccessful) throw IOException(Lang.t("Error del servidor (${response.code})", "Server error (${response.code})"))
+                    return response.body?.bytes() ?: throw IOException(Lang.t("Respuesta vacía", "Empty response"))
                 }
             } catch (e: IOException) {
                 lastError = e
             }
         }
-        throw lastError ?: IOException("Error de descarga")
+        throw lastError ?: IOException(Lang.t("Error de descarga", "Download error"))
     }
 
     // ---- Imágenes incrustadas (data:) ----

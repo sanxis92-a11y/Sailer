@@ -103,7 +103,7 @@ class MainActivity : SecureActivity(),
                 startDownload(url, MediaSniffer.kindForMime(mimeType) ?: MediaKind.FILE, mimeType, name)
             },
         )
-        val homeHtml = assets.open("home.html").bufferedReader().use { it.readText() }
+        val homeHtml = assets.open(Lang.asset("home.html")).bufferedReader().use { it.readText() }
         tabManager = TabManager({ createWebView() }, homeHtml, this)
 
         setUpAddressBar()
@@ -191,6 +191,7 @@ class MainActivity : SecureActivity(),
     private fun showMenu(anchor: View) {
         PopupMenu(this, anchor).apply {
             menuInflater.inflate(R.menu.main_menu, menu)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) setForceShowIcon(true)
             menu.findItem(R.id.action_forward).isEnabled = tabManager.current?.webView?.canGoForward() == true
             val client = tabManager.current?.webView?.webViewClient as? SailerWebViewClient
             val siteItem = menu.findItem(R.id.action_adblock_site)

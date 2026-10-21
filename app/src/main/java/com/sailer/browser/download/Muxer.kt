@@ -1,5 +1,6 @@
 package com.sailer.browser.download
 
+import com.sailer.browser.Lang
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -22,8 +23,8 @@ object Muxer {
         try {
             videoEx.setDataSource(videoSource)
             audioEx.setDataSource(audioSource)
-            val videoTrack = findTrack(videoEx, "video/") ?: throw IOException("No hay pista de vídeo")
-            val audioTrack = findTrack(audioEx, "audio/") ?: throw IOException("No hay pista de audio")
+            val videoTrack = findTrack(videoEx, "video/") ?: throw IOException(Lang.t("No hay pista de vídeo", "No video track"))
+            val audioTrack = findTrack(audioEx, "audio/") ?: throw IOException(Lang.t("No hay pista de audio", "No audio track"))
             videoEx.selectTrack(videoTrack)
             audioEx.selectTrack(audioTrack)
             val videoFormat = videoEx.getTrackFormat(videoTrack)

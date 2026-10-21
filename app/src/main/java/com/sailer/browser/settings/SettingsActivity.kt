@@ -13,6 +13,7 @@ import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.sailer.browser.lock.showSecure
 import com.sailer.browser.BuildConfig
+import com.sailer.browser.Lang
 import com.sailer.browser.R
 import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.adblock.CosmeticFilter
@@ -130,7 +131,7 @@ class SettingsActivity : SecureActivity() {
 
     /** Muestra un texto largo guardado en assets (política de privacidad, licencias). */
     private fun showTextAsset(title: Int, asset: String) {
-        val text = assets.open(asset).bufferedReader().use { it.readText() }
+        val text = assets.open(Lang.asset(asset)).bufferedReader().use { it.readText() }
         MaterialAlertDialogBuilder(this)
             .setTitle(title)
             .setMessage(text)

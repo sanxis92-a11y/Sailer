@@ -1,5 +1,6 @@
 package com.sailer.browser.vault
 
+import com.sailer.browser.Lang
 import android.content.Context
 import com.sailer.browser.media.MediaKind
 import java.io.DataInputStream
@@ -29,7 +30,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 object Backup {
 
-    class WrongPasswordException : IOException("Contraseña incorrecta o archivo dañado")
+    class WrongPasswordException : IOException(Lang.t("Contraseña incorrecta o archivo dañado", "Wrong password or damaged file"))
 
     data class Result(val files: Int, val bookmarks: Int)
 
@@ -79,20 +80,20 @@ object Backup {
         try {
             DataInputStream(source).readFully(header)
         } catch (e: EOFException) {
-            throw IOException("No es una copia de Sailer")
+            throw IOException(Lang.t("No es una copia de Sailer", "Not a Sailer backup"))
         }
         val buffer = ByteBuffer.wrap(header)
         val magic = ByteArray(MAGIC.size).also { buffer.get(it) }
-        if (!magic.contentEquals(MAGIC)) throw IOException("No es una copia de Sailer")
+        if (!magic.contentEquals(MAGIC)) throw IOException(Lang.t("No es una copia de Sailer", "Not a Sailer backup"))
         val salt = ByteArray(16).also { buffer.get(it) }
         val iterations = buffer.int
-        if (iterations !in 10_000..10_000_000) throw IOException("No es una copia de Sailer")
+        if (iterations !in 10_000..10_000_000) throw IOException(Lang.t("No es una copia de Sailer", "Not a Sailer backup"))
         val key = deriveKey(password, salt, iterations)
 
         val vault = Vault.get(context)
         val bookmarksStore = Bookmarks.get(context)
         DataInputStream(OpenInput(source, key, header).buffered(SEGMENT)).use { input ->
-            if (input.readInt() != FORMAT) throw IOException("Versión de copia no compatible")
+            if (input.readInt() != FORMAT) throw IOException(Lang.t("Versión de copia no compatible", "Unsupported backup version"))
             val bookmarkCount = input.readInt()
             repeat(bookmarkCount) {
                 val title = readText(input)
@@ -143,7 +144,7 @@ object Backup {
 
     private fun readText(input: DataInputStream): String {
         val size = input.readInt()
-        if (size !in 0..1_000_000) throw IOException("Copia dañada")
+        if (size !in 0..1_000_000) throw IOException(Lang.t("Copia dañada", "Damaged backup"))
         return ByteArray(size).also { input.readFully(it) }.toString(Charsets.UTF_8)
     }
 
@@ -152,7 +153,7 @@ object Backup {
         var remaining = size
         while (remaining > 0) {
             val n = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
-            if (n < 0) throw IOException("Copia incompleta")
+            if (n < 0) throw IOException(Lang.t("Copia incompleta", "Incomplete backup"))
             out.write(buffer, 0, n)
             remaining -= n
         }
@@ -243,7 +244,7 @@ object Backup {
             val size = try {
                 input.readInt()
             } catch (e: EOFException) {
-                throw IOException("Copia incompleta")
+                throw IOException(Lang.t("Copia incompleta", "Incomplete backup"))
             }
             if (size !in 16..SEGMENT + 16) throw WrongPasswordException()
             val nonce = ByteArray(NONCE).also { input.readFully(it) }

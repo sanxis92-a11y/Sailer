@@ -8,23 +8,22 @@
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@color/surface"
-        app:navigationIcon="@drawable/ic_back"
+        style="@style/SailerToolbar"
         app:subtitle="@string/bookmarks_subtitle"
-        app:subtitleTextColor="@color/text_dim"
-        app:title="@string/menu_bookmarks"
-        app:titleTextColor="@color/text" />
+        app:title="@string/menu_bookmarks" />
 
     <TextView
         android:id="@+id/noPinHint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/field"
-        android:padding="12dp"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_hint_banner"
+        android:drawableStart="@drawable/ic_lock"
+        android:drawablePadding="10dp"
+        android:gravity="center_vertical"
+        android:padding="14dp"
         android:text="@string/bookmarks_no_pin"
-        android:textColor="@color/text"
+        android:textColor="@color/on_accent_container"
         android:textSize="13sp"
         android:visibility="gone" />
 
@@ -36,17 +35,40 @@
             android:id="@+id/list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:divider="@color/field"
+            android:divider="@color/stroke"
             android:dividerHeight="1dp" />
 
-        <TextView
+        <LinearLayout
             android:id="@+id/empty"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:padding="32dp"
-            android:text="@string/bookmarks_empty"
-            android:textColor="@color/text_dim"
-            android:textSize="15sp" />
+            style="@style/SailerEmptyState">
+
+            <ImageView
+                android:layout_width="88dp"
+                android:layout_height="88dp"
+                android:background="@drawable/bg_icon_circle"
+                android:contentDescription="@null"
+                android:padding="24dp"
+                android:src="@drawable/ic_bookmarks"
+                app:tint="@color/accent" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/bookmarks_empty_title"
+                android:textColor="@color/text"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.2"
+                android:text="@string/bookmarks_empty"
+                android:textColor="@color/text_dim"
+                android:textSize="14sp" />
+        </LinearLayout>
     </FrameLayout>
 </LinearLayout>

@@ -1,5 +1,6 @@
 package com.sailer.browser.download
 
+import com.sailer.browser.Lang
 import java.io.IOException
 
 /**
@@ -10,7 +11,7 @@ import java.io.IOException
  */
 object HlsDownloader {
 
-    class DrmException : IOException("Este vídeo está protegido con DRM y no se puede descargar.")
+    class DrmException : IOException(Lang.t("Este vídeo está protegido con DRM y no se puede descargar.", "This video is DRM protected and can't be downloaded."))
 
     /**
      * @param url lista maestra o lista de una calidad concreta.
@@ -18,10 +19,10 @@ object HlsDownloader {
      */
     fun plan(url: String, audioUrl: String?, fetchText: (String) -> String): Plan {
         val text = fetchText(url)
-        if (!text.trimStart().startsWith("#EXTM3U")) throw IOException("No es una lista HLS válida")
+        if (!text.trimStart().startsWith("#EXTM3U")) throw IOException(Lang.t("No es una lista HLS válida", "Not a valid HLS playlist"))
         if (HlsPlaylist.isMaster(text)) {
             val variants = HlsPlaylist.variants(url, text)
-            val best = variants.maxByOrNull { it.bandwidth } ?: throw IOException("No se encontró ninguna calidad de vídeo")
+            val best = variants.maxByOrNull { it.bandwidth } ?: throw IOException(Lang.t("No se encontró ninguna calidad de vídeo", "No video quality found"))
             val audio = best.audioGroup?.let { HlsPlaylist.audioRenditions(url, text)[it] }
             return plan(best.url, audio, fetchText)
         }
@@ -51,7 +52,7 @@ object HlsDownloader {
                     when {
                         a["METHOD"] == "NONE" -> { keyUrl = null; keyIv = null }
                         a["METHOD"] == "AES-128" && (format == null || format == "identity") -> {
-                            keyUrl = HlsPlaylist.resolve(playlistUrl, a["URI"] ?: throw IOException("Clave HLS sin dirección"))
+                            keyUrl = HlsPlaylist.resolve(playlistUrl, a["URI"] ?: throw IOException(Lang.t("Clave HLS sin dirección", "HLS key without address")))
                             keyIv = a["IV"]?.let(::parseHexIv)
                         }
                         else -> throw DrmException()
@@ -96,7 +97,7 @@ object HlsDownloader {
                 }
             }
         }
-        if (pieces.isEmpty()) throw IOException("La lista HLS está vacía")
+        if (pieces.isEmpty()) throw IOException(Lang.t("La lista HLS está vacía", "The HLS playlist is empty"))
         // Audio "empaquetado" (.aac, .mp3...) sin contenedor.
         val firstExt = com.sailer.browser.media.MediaSniffer.extensionOf(pieces.last().url)
         if (extension == "ts" && firstExt in setOf("aac", "mp3", "ac3", "ec3")) extension = firstExt!!

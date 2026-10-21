@@ -1,5 +1,6 @@
 package com.sailer.browser.vault
 
+import com.sailer.browser.Lang
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -68,7 +69,7 @@ class Vault private constructor(context: Context) {
                 crypto.decrypt(file).use { input ->
                     crypto.encrypt(FileOutputStream(tmp).buffered(256 * 1024)).use { out -> input.copyTo(out, 256 * 1024) }
                 }
-                if (!tmp.renameTo(file)) throw java.io.IOException("No se pudo reemplazar")
+                if (!tmp.renameTo(file)) throw java.io.IOException(Lang.t("No se pudo reemplazar", "Couldn't replace the file"))
             }.onFailure { tmp.delete() }
         }
     }

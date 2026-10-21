@@ -5,27 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Nueva pestaña</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #121417; color: #e8eaed;
+  html, body { margin: 0; height: 100%; background: #0E1014; color: #ECEEF2;
     font-family: system-ui, -apple-system, Roboto, sans-serif; }
   main { min-height: 100%; display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 24px; box-sizing: border-box; text-align: center; }
-  h1 { font-size: 34px; margin: 0 0 8px; letter-spacing: 1px; }
-  h1 span { color: #7c5cff; }
-  p { color: #9aa0a6; margin: 4px 0; font-size: 15px; line-height: 1.5; }
-  ul { list-style: none; padding: 0; margin: 28px 0 0; max-width: 340px; text-align: left; }
-  li { background: #1e2126; border-radius: 12px; padding: 12px 14px; margin: 8px 0;
-    font-size: 14px; color: #c9ccd1; }
+    justify-content: center; padding: 32px 20px; box-sizing: border-box; text-align: center; }
+  .logo { width: 84px; height: 84px; border-radius: 26px;
+    background: linear-gradient(135deg, #6D5BFF, #2A1F8F);
+    box-shadow: 0 10px 30px rgba(109, 91, 255, .35); }
+  h1 { font-size: 30px; margin: 18px 0 4px; letter-spacing: .5px; }
+  .tag { color: #9AA3B0; margin: 0; font-size: 15px; }
+  ul { list-style: none; padding: 0; margin: 32px 0 0; width: 100%; max-width: 360px; text-align: left; }
+  li { display: flex; align-items: center; gap: 14px; background: #16191F; border: 1px solid #2F3541;
+    border-radius: 16px; padding: 14px 16px; margin: 10px 0; font-size: 14px; color: #C9CED6; line-height: 1.4; }
+  li svg { flex: none; width: 22px; height: 22px; fill: #8B7BFF; }
+  b { color: #ECEEF2; font-weight: 600; }
 </style>
 </head>
 <body>
 <main>
-  <h1>⛵ <span>Sailer</span></h1>
-  <p>Navegación privada</p>
+  <svg class="logo" viewBox="0 0 108 108" aria-hidden="true">
+    <path fill="#fff" d="M52 27 52 66 29 66Q40 50 52 27Z"/><path fill="#D6CEFF" d="M56 33 56 66 77 66Q70 49 56 33Z"/>
+    <path fill="#fff" d="M53 24h2v45h-2z"/><path fill="#fff" d="M27 70h54q-3 10-14 12H41Q30 80 27 70Z"/>
+  </svg>
+  <h1>Sailer</h1>
+  <p class="tag">Navegación privada</p>
   <ul>
-    <li>🕶️ Todo se borra al salir</li>
-    <li>🛡️ Anuncios y rastreadores bloqueados</li>
-    <li>⬇️ Pulsa la flecha de arriba para descargar vídeos</li>
-    <li>🔒 Tus descargas se guardan cifradas</li>
+    <li><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg><span><b>Sin rastro.</b> Todo se borra al salir</span></li>
+    <li><svg viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg><span><b>Sin anuncios.</b> Anuncios y rastreadores bloqueados</span></li>
+    <li><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><span><b>Descargas.</b> Pulsa la flecha de arriba para guardar vídeos y audios</span></li>
+    <li><svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6z"/></svg><span><b>Cifrado.</b> Tus descargas se guardan en una carpeta segura</span></li>
   </ul>
 </main>
 </body>
