@@ -54,7 +54,7 @@
     <!-- Secure folder -->
     <string name="vault_subtitle">Encrypted and hidden from the gallery</string>
     <string name="vault_empty_title">Nothing here yet</string>
-    <string name="vault_empty">Your downloads will appear here.\n\nEverything is stored encrypted: neither the gallery nor other apps can see it.</string>
+    <string name="vault_empty">Your downloads will appear here.\n\nEverything is stored encrypted: neither the gallery nor other apps can see it.\n\nYou can also tap Import to keep files from your phone here.</string>
     <string name="vault_queued">Queued…</string>
     <string name="vault_downloading">Downloading…</string>
     <string name="vault_progress">Downloading… %d%%</string>
@@ -79,6 +79,36 @@
     <string name="vault_export_failed">Couldn\'t export</string>
     <string name="vault_delete">Delete</string>
     <string name="vault_delete_confirm">Delete “%s” forever?</string>
+    <string name="vault_new_folder">New folder</string>
+    <string name="vault_folder_name">Folder name</string>
+    <string name="vault_import">Import from phone</string>
+    <string name="vault_sort">Sort</string>
+    <string name="vault_search">Search</string>
+    <string name="sort_date">Newest first</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_size">Size (largest first)</string>
+    <string name="sort_type">Type</string>
+    <string name="vault_move">Move</string>
+    <string name="vault_move_to">Move to…</string>
+    <string name="vault_root">Secure folder (main)</string>
+    <string name="vault_share">Share</string>
+    <string name="vault_share_warning">To share, a temporary unencrypted copy is created that the other app will be able to see. It\'s erased when you close Nauvel.</string>
+    <string name="vault_select_all">Select all</string>
+    <string name="vault_selected">%d selected</string>
+    <string name="vault_delete_many">Delete %d item(s) forever? Folders are deleted with everything inside.</string>
+    <string name="vault_folder_items">%d file(s)</string>
+    <string name="vault_importing">Importing %d file(s)…</string>
+    <string name="vault_imported">Imported %d file(s) into the secure folder</string>
+    <string name="vault_import_failed">%d file(s) couldn\'t be imported</string>
+    <string name="vault_delete_originals_title">Delete the originals?</string>
+    <string name="vault_delete_originals">The files are now encrypted in Nauvel. Do you want to delete the unencrypted originals from your phone?</string>
+    <string name="vault_delete_originals_failed">%d original(s) couldn\'t be deleted. Delete them from your file manager.</string>
+    <string name="vault_keep">Keep them</string>
+    <string name="vault_exported_many">Exported %d file(s)</string>
+    <string name="vault_no_results">Nothing found</string>
+    <string name="vault_empty_folder_title">This folder is empty</string>
+    <string name="vault_empty_folder">Tap Import to add files from your phone, or move files here.</string>
+    <string name="vault_preparing">Preparing…</string>
     <string name="viewer_error">This file can\'t be opened</string>
 
     <!-- Lock -->

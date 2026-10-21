@@ -53,7 +53,7 @@
     <!-- Carpeta segura -->
     <string name="vault_subtitle">Cifrada y oculta de la galería</string>
     <string name="vault_empty_title">Todavía no hay nada</string>
-    <string name="vault_empty">Aquí aparecerán tus descargas.\n\nTodo se guarda cifrado: ni la galería ni otras apps pueden verlo.</string>
+    <string name="vault_empty">Aquí aparecerán tus descargas.\n\nTodo se guarda cifrado: ni la galería ni otras apps pueden verlo.\n\nTambién puedes pulsar Importar para guardar aquí archivos del móvil.</string>
     <string name="vault_queued">En cola…</string>
     <string name="vault_downloading">Descargando…</string>
     <string name="vault_progress">Descargando… %d%%</string>
@@ -78,6 +78,36 @@
     <string name="vault_export_failed">No se pudo exportar</string>
     <string name="vault_delete">Borrar</string>
     <string name="vault_delete_confirm">¿Borrar «%s» para siempre?</string>
+    <string name="vault_new_folder">Nueva carpeta</string>
+    <string name="vault_folder_name">Nombre de la carpeta</string>
+    <string name="vault_import">Importar del móvil</string>
+    <string name="vault_sort">Ordenar</string>
+    <string name="vault_search">Buscar</string>
+    <string name="sort_date">Más recientes primero</string>
+    <string name="sort_name">Nombre</string>
+    <string name="sort_size">Tamaño (más grandes primero)</string>
+    <string name="sort_type">Tipo</string>
+    <string name="vault_move">Mover</string>
+    <string name="vault_move_to">Mover a…</string>
+    <string name="vault_root">Carpeta segura (principal)</string>
+    <string name="vault_share">Compartir</string>
+    <string name="vault_share_warning">Para compartir se crea una copia temporal SIN cifrar que la otra app podrá ver. Se borra al cerrar Nauvel.</string>
+    <string name="vault_select_all">Seleccionar todo</string>
+    <string name="vault_selected">%d seleccionados</string>
+    <string name="vault_delete_many">¿Borrar %d elemento(s) para siempre? Las carpetas se borran con todo lo que tienen dentro.</string>
+    <string name="vault_folder_items">%d archivo(s)</string>
+    <string name="vault_importing">Importando %d archivo(s)…</string>
+    <string name="vault_imported">Importados %d archivo(s) a la carpeta segura</string>
+    <string name="vault_import_failed">No se pudieron importar %d archivo(s)</string>
+    <string name="vault_delete_originals_title">¿Borrar los originales?</string>
+    <string name="vault_delete_originals">Los archivos ya están cifrados en Nauvel. ¿Quieres borrar del móvil los originales sin cifrar?</string>
+    <string name="vault_delete_originals_failed">No se pudieron borrar %d original(es). Bórralos desde tu gestor de archivos.</string>
+    <string name="vault_keep">Conservarlos</string>
+    <string name="vault_exported_many">Exportados %d archivo(s)</string>
+    <string name="vault_no_results">No se ha encontrado nada</string>
+    <string name="vault_empty_folder_title">Esta carpeta está vacía</string>
+    <string name="vault_empty_folder">Pulsa Importar para añadir archivos del móvil, o mueve archivos aquí.</string>
+    <string name="vault_preparing">Preparando…</string>
     <string name="viewer_error">No se puede abrir este archivo</string>
 
     <!-- Bloqueo -->

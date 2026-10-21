@@ -38,7 +38,8 @@ object Backup {
     private const val ITERATIONS = 310_000
     private const val SEGMENT = 64 * 1024
     private const val NONCE = 12
-    private const val FORMAT = 1
+    /** 1 = sin carpetas; 2 = con carpetas. Se siguen pudiendo leer las dos. */
+    private const val FORMAT = 2
     private val random = SecureRandom()
 
     /** Escribe la copia en [target]. [onProgress] recibe (hechos, total). */
@@ -58,6 +59,9 @@ object Backup {
                 writeText(out, it.url)
                 out.writeLong(it.created)
             }
+            val folders = vault.allFolders()
+            out.writeInt(folders.size)
+            folders.forEach { writeText(out, it) }
             out.writeInt(entries.size)
             entries.forEachIndexed { i, entry ->
                 onProgress(i, entries.size)
@@ -65,6 +69,7 @@ object Backup {
                 writeText(out, entry.name)
                 writeText(out, entry.kind.name)
                 writeText(out, entry.mime ?: "")
+                writeText(out, entry.folder)
                 out.writeLong(entry.created)
                 out.writeLong(size)
                 vault.openInput(entry).use { input -> copyExactly(input, out, size) }
@@ -93,7 +98,8 @@ object Backup {
         val vault = Vault.get(context)
         val bookmarksStore = Bookmarks.get(context)
         DataInputStream(OpenInput(source, key, header).buffered(SEGMENT)).use { input ->
-            if (input.readInt() != FORMAT) throw IOException(Lang.t("Versión de copia no compatible", "Unsupported backup version"))
+            val format = input.readInt()
+            if (format !in 1..FORMAT) throw IOException(Lang.t("Versión de copia no compatible", "Unsupported backup version"))
             val bookmarkCount = input.readInt()
             repeat(bookmarkCount) {
                 val title = readText(input)
@@ -101,18 +107,20 @@ object Backup {
                 input.readLong()
                 bookmarksStore.add(title, url)
             }
+            if (format >= 2) repeat(input.readInt()) { vault.ensureFolder(readText(input)) }
             val count = input.readInt()
             for (i in 0 until count) {
                 onProgress(i, count)
                 val name = readText(input)
                 val kind = runCatching { MediaKind.valueOf(readText(input)) }.getOrDefault(MediaKind.FILE)
                 val mime = readText(input).ifEmpty { null }
+                val folder = if (format >= 2) readText(input) else ""
                 val created = input.readLong()
                 val size = input.readLong()
                 val writer = vault.newWriter()
                 try {
                     copyExactly(input, writer.output, size)
-                    writer.commit(name, kind, mime, created)
+                    writer.commit(name, kind, mime, created, folder)
                 } catch (e: Exception) {
                     writer.abort()
                     throw e
