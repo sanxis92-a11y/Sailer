@@ -90,8 +90,6 @@
     <string name="vault_move">Mover</string>
     <string name="vault_move_to">Mover a…</string>
     <string name="vault_root">Carpeta segura (principal)</string>
-    <string name="vault_share">Compartir</string>
-    <string name="vault_share_warning">Para compartir se crea una copia temporal SIN cifrar que la otra app podrá ver. Se borra al cerrar Nauvel.</string>
     <string name="vault_select_all">Seleccionar todo</string>
     <string name="vault_selected">%d seleccionados</string>
     <string name="vault_delete_many">¿Borrar %d elemento(s) para siempre? Las carpetas se borran con todo lo que tienen dentro.</string>

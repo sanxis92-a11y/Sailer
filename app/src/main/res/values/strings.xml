@@ -91,8 +91,6 @@
     <string name="vault_move">Move</string>
     <string name="vault_move_to">Move to…</string>
     <string name="vault_root">Secure folder (main)</string>
-    <string name="vault_share">Share</string>
-    <string name="vault_share_warning">To share, a temporary unencrypted copy is created that the other app will be able to see. It\'s erased when you close Nauvel.</string>
     <string name="vault_select_all">Select all</string>
     <string name="vault_selected">%d selected</string>
     <string name="vault_delete_many">Delete %d item(s) forever? Folders are deleted with everything inside.</string>

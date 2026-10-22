@@ -1,6 +1,5 @@
 package com.sailer.browser.vault
 
-import android.content.ClipData
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -19,7 +18,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.sailer.browser.R
 import com.sailer.browser.databinding.ActivityVaultBinding
@@ -31,7 +29,6 @@ import com.sailer.browser.lock.showSecure
 import com.sailer.browser.media.MediaKind
 import com.sailer.browser.media.MediaSniffer
 import com.sailer.browser.settings.Prefs
-import java.io.File
 import kotlin.concurrent.thread
 
 /**
@@ -155,7 +152,6 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             toolbar.setNavigationIcon(R.drawable.ic_close)
             val single = selectedFiles.size + selectedFolders.size == 1
             toolbar.menu.findItem(R.id.action_rename).isVisible = single
-            toolbar.menu.findItem(R.id.action_share).isVisible = selectedFolders.isEmpty()
         } else {
             toolbar.inflateMenu(R.menu.vault_menu)
             toolbar.title = if (folder.isEmpty()) getString(R.string.menu_vault) else Vault.nameOf(folder)
@@ -170,7 +166,6 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 R.id.action_new_folder -> askFolderName(R.string.vault_new_folder, "") { vault.createFolder(folder, it) }
                 R.id.action_import -> startImport()
                 R.id.action_move -> chooseMoveTarget()
-                R.id.action_share -> confirmShare(selectedRows())
                 R.id.action_delete -> confirmDelete(selectedRows())
                 R.id.action_select_all -> selectAll()
                 R.id.action_rename -> selectedRows().singleOrNull()?.let { rename(it) }
@@ -302,7 +297,6 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             getString(R.string.vault_rename),
             getString(R.string.vault_move),
             getString(R.string.vault_export),
-            getString(R.string.vault_share),
             getString(R.string.vault_delete),
         )
         MaterialAlertDialogBuilder(this)
@@ -312,8 +306,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                     0 -> rename(row)
                     1 -> chooseMoveTarget(listOf(row))
                     2 -> confirmExport(listOf(row))
-                    3 -> confirmShare(listOf(row))
-                    4 -> confirmDelete(listOf(row))
+                    3 -> confirmDelete(listOf(row))
                 }
             }
             .showSecure()
@@ -484,51 +477,6 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             runOnUiThread {
                 toast(if (result.isSuccess) getString(R.string.vault_exported_many, done) else getString(R.string.vault_export_failed))
                 if (result.isSuccess) clearSelection()
-            }
-        }
-    }
-
-    private fun confirmShare(rows: List<Row>) {
-        val files = rows.filterIsInstance<Row.File>().map { it.entry }
-        if (files.isEmpty()) return
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.vault_share)
-            .setMessage(R.string.vault_share_warning)
-            .setPositiveButton(R.string.vault_share) { _, _ -> share(files) }
-            .setNegativeButton(android.R.string.cancel, null)
-            .showSecure()
-    }
-
-    /** Descifra en la caché (que se borra al cerrar la app) y abre el menú de compartir de Android. */
-    private fun share(files: List<Vault.Entry>) {
-        toast(getString(R.string.vault_preparing))
-        thread {
-            val uris = runCatching {
-                val dir = File(cacheDir, "share").apply { deleteRecursively(); mkdirs() }
-                files.mapIndexed { i, entry ->
-                    val sub = File(dir, i.toString()).apply { mkdirs() }
-                    val file = File(sub, entry.name.replace('/', '-'))
-                    file.outputStream().use { out -> vault.openInput(entry).use { it.copyTo(out, 128 * 1024) } }
-                    FileProvider.getUriForFile(this, "$packageName.share", file)
-                }
-            }.getOrNull()
-            runOnUiThread {
-                if (uris == null) {
-                    toast(getString(R.string.vault_export_failed))
-                    return@runOnUiThread
-                }
-                val mime = files.map { it.mime ?: "*/*" }.distinct().singleOrNull() ?: "*/*"
-                val intent = if (uris.size == 1) {
-                    Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0])
-                } else {
-                    Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-                }
-                intent.type = mime
-                intent.clipData = ClipData.newRawUri("", uris[0]).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                AppLock.skipLockBriefly()
-                startActivity(Intent.createChooser(intent, getString(R.string.vault_share)))
-                clearSelection()
             }
         }
     }
