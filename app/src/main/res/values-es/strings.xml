@@ -59,6 +59,9 @@
     <string name="grab_more_pages">Buscar en las páginas siguientes de la galería</string>
     <string name="grab_searching_page">Buscando… página %d</string>
     <string name="grab_done">Revisadas todas las páginas</string>
+    <string name="grab_deep">Analizar a fondo: abrir %d páginas de la galería y coger las fotos grandes</string>
+    <string name="grab_deep_progress">Analizando a fondo… %1$d de %2$d páginas</string>
+    <string name="grab_deep_done">Análisis a fondo terminado</string>
     <string name="download_image">Descargar imagen</string>
     <string name="download_link">Descargar enlace</string>
     <string name="open_new_tab">Abrir en pestaña nueva</string>
@@ -150,6 +153,9 @@
     <string name="crash_message">Se ha guardado un informe del error solo en este móvil. Si quieres, cópialo y envíamelo para arreglarlo.</string>
     <string name="crash_copy">Copiar informe</string>
     <string name="crash_copied">Informe copiado</string>
+    <string name="vault_organize">Organizar en galerías</string>
+    <string name="vault_organize_done">%d archivo(s) organizados en galerías (web / página)</string>
+    <string name="vault_organize_none">Aquí no hay nada que organizar: solo los archivos descargados con esta versión saben de qué web y página vienen.</string>
     <string name="viewer_error">No se puede abrir este archivo</string>
 
     <!-- Bloqueo -->

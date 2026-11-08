@@ -39,7 +39,7 @@ object Backup {
     private const val SEGMENT = 64 * 1024
     private const val NONCE = 12
     /** 1 = sin carpetas; 2 = con carpetas. Se siguen pudiendo leer las dos. */
-    private const val FORMAT = 2
+    private const val FORMAT = 3
     private val random = SecureRandom()
 
     /** Escribe la copia en [target]. [onProgress] recibe (hechos, total). */
@@ -70,6 +70,8 @@ object Backup {
                 writeText(out, entry.kind.name)
                 writeText(out, entry.mime ?: "")
                 writeText(out, entry.folder)
+                writeText(out, entry.source)
+                writeText(out, entry.album)
                 out.writeLong(entry.created)
                 out.writeLong(size)
                 vault.openInput(entry).use { input -> copyExactly(input, out, size) }
@@ -115,12 +117,14 @@ object Backup {
                 val kind = runCatching { MediaKind.valueOf(readText(input)) }.getOrDefault(MediaKind.FILE)
                 val mime = readText(input).ifEmpty { null }
                 val folder = if (format >= 2) readText(input) else ""
+                val source = if (format >= 3) readText(input) else ""
+                val album = if (format >= 3) readText(input) else ""
                 val created = input.readLong()
                 val size = input.readLong()
                 val writer = vault.newWriter()
                 try {
                     copyExactly(input, writer.output, size)
-                    writer.commit(name, kind, mime, created, folder)
+                    writer.commit(name, kind, mime, created, folder, source, album)
                 } catch (e: Exception) {
                     writer.abort()
                     throw e

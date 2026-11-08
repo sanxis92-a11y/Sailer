@@ -31,6 +31,10 @@ class Vault private constructor(context: Context) {
         val created: Long,
         /** Carpeta donde está ("" = raíz; subcarpetas separadas por "/"). */
         val folder: String = "",
+        /** Página de la que se descargó (para organizar en galerías). */
+        val source: String = "",
+        /** Título de esa página o galería. */
+        val album: String = "",
     )
 
     fun interface Listener {
@@ -190,9 +194,11 @@ class Vault private constructor(context: Context) {
             mime: String?,
             created: Long = System.currentTimeMillis(),
             folder: String = "",
+            source: String = "",
+            album: String = "",
         ): Entry {
             output.close()
-            val entry = Entry(id, name, kind, mime, crypto.plainLength(file), created, folder)
+            val entry = Entry(id, name, kind, mime, crypto.plainLength(file), created, folder, source, album)
             synchronized(this@Vault) {
                 if (folder.isNotEmpty()) addFolderLocked(folder)
                 entries.add(entry)
@@ -209,14 +215,22 @@ class Vault private constructor(context: Context) {
     }
 
     /** Mete en la carpeta segura un archivo ya cifrado con [crypto] (lo mueve). */
-    fun adopt(file: File, name: String, kind: MediaKind, mime: String?, folder: String = ""): Entry {
+    fun adopt(
+        file: File,
+        name: String,
+        kind: MediaKind,
+        mime: String?,
+        folder: String = "",
+        source: String = "",
+        album: String = "",
+    ): Entry {
         val id = UUID.randomUUID().toString()
         val target = File(dir, "$id.bin")
         if (!file.renameTo(target)) {
             file.copyTo(target, overwrite = true)
             file.delete()
         }
-        val entry = Entry(id, name, kind, mime, crypto.plainLength(target), System.currentTimeMillis(), folder)
+        val entry = Entry(id, name, kind, mime, crypto.plainLength(target), System.currentTimeMillis(), folder, source, album)
         synchronized(this) {
             if (folder.isNotEmpty()) addFolderLocked(folder)
             entries.add(entry)
@@ -224,6 +238,28 @@ class Vault private constructor(context: Context) {
         }
         notifyChanged()
         return entry
+    }
+
+    /**
+     * Organiza en galerías los archivos que están directamente en [folder]:
+     * cada uno va a «web/título de la página» según de dónde se descargó.
+     * Devuelve cuántos se han movido.
+     */
+    fun organize(folder: String): Int {
+        var moved = 0
+        synchronized(this) {
+            entries.replaceAll { e ->
+                if (e.folder != folder || e.source.isEmpty()) return@replaceAll e
+                val target = galleryFolder(e.source, e.album)
+                if (target.isEmpty() || target == e.folder) return@replaceAll e
+                addFolderLocked(target)
+                moved++
+                e.copy(folder = target)
+            }
+            if (moved > 0) saveIndex()
+        }
+        if (moved > 0) notifyChanged()
+        return moved
     }
 
     fun delete(entry: Entry) = delete(listOf(entry))
@@ -278,6 +314,8 @@ class Vault private constructor(context: Context) {
                         size = o.optLong("size"),
                         created = o.optLong("created"),
                         folder = o.optString("folder"),
+                        source = o.optString("source"),
+                        album = o.optString("album"),
                     )
                 )
             }
@@ -296,6 +334,8 @@ class Vault private constructor(context: Context) {
                     .put("size", e.size)
                     .put("created", e.created)
                     .put("folder", e.folder)
+                    .put("source", e.source)
+                    .put("album", e.album)
             )
         }
         val root = JSONObject().put("entries", json).put("folders", JSONArray(folders.toList()))
@@ -305,6 +345,15 @@ class Vault private constructor(context: Context) {
     }
 
     companion object {
+        /** «web» o «web/galería» para lo descargado de [pageUrl]. */
+        fun galleryFolder(pageUrl: String?, album: String?): String {
+            val host = pageUrl?.takeIf { it.startsWith("http") }
+                ?.let { runCatching { android.net.Uri.parse(it).host }.getOrNull() } ?: return ""
+            val site = cleanName(host.removePrefix("www."))
+            val title = album?.trim()?.take(60)?.takeIf { it.isNotEmpty() } ?: return site
+            return join(site, cleanName(title))
+        }
+
         fun join(parent: String, name: String) = if (parent.isEmpty()) name else "$parent/$name"
 
         fun parentOf(path: String) = path.substringBeforeLast('/', "")

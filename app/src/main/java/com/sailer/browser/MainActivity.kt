@@ -500,7 +500,9 @@ class MainActivity : SecureActivity(),
             val o = imageArray.getJSONObject(i)
             PageImage(o.optString("src"), o.optInt("w"), o.optInt("h"))
         }
-        PageMediaInfo(json.optString("title"), json.optString("image"), elements, images)
+        val detailArray = json.optJSONArray("details") ?: JSONArray()
+        val details = (0 until detailArray.length()).map { detailArray.getString(it) }
+        PageMediaInfo(json.optString("title"), json.optString("image"), elements, images, details)
     }.getOrNull()
 
     private fun showMediaSheet(tab: Tab, info: PageMediaInfo) {
@@ -514,14 +516,15 @@ class MainActivity : SecureActivity(),
 
         val images = if (BuildConfig.GRABBER) {
             info.images.filter { StorePolicy.allowsDownload(it.url, tab.url) }
-                .map { GrabItem(it.url, MediaKind.IMAGE, it.width, it.height, tab.url) }
+                .map { GrabItem(it.url, MediaKind.IMAGE, it.width, it.height, tab.url, pageTitle) }
+                .let { LinkGrabber.dropSmallVariants(it) }
         } else {
             emptyList()
         }
         if (images.isNotEmpty()) {
             view.options.addView(imagesRow(view, images.size) {
                 sheet.dismiss()
-                showImagePicker(images, pageTitle, tab.url.takeIf { it.startsWith("https://") })
+                showImagePicker(images, pageTitle, tab.url.takeIf { it.startsWith("https://") }, info.details)
             })
         }
 
@@ -622,7 +625,12 @@ class MainActivity : SecureActivity(),
      * se marcan las que se quieren y se bajan todas juntas. Con [crawlFrom], el
      * botón «Buscar en más páginas» recorre la galería siguiendo «Siguiente».
      */
-    private fun showImagePicker(initial: List<GrabItem>, pageTitle: String, crawlFrom: String?) {
+    private fun showImagePicker(
+        initial: List<GrabItem>,
+        pageTitle: String,
+        crawlFrom: String?,
+        initialDetails: List<String> = emptyList(),
+    ) {
         val sheet = BottomSheetDialog(this)
         sheet.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val view = SheetImagesBinding.inflate(layoutInflater)
@@ -638,6 +646,23 @@ class MainActivity : SecureActivity(),
         val loading = mutableMapOf<String, Job>()
         val limit = Semaphore(4)
         var crawlJob: Job? = null
+        var deepJob: Job? = null
+        val details = linkedSetOf<String>().apply { addAll(initialDetails) }
+        val grabber = LinkGrabber(this, userAgent)
+
+        fun addFound(found: List<GrabItem>) {
+            // Juntar con lo que ya hay y quitar las versiones pequeñas de la misma foto.
+            val merged = LinkGrabber.dropSmallVariants(items + found.filter { StorePolicy.allowsDownload(it.url, it.referer) })
+            val kept = merged.mapTo(HashSet()) { it.url }
+            selected.retainAll(kept)
+            items.clear()
+            items.addAll(merged)
+        }
+
+        fun updateDeepButton() {
+            view.deepScan.visibility = if (details.isEmpty() && deepJob == null) View.GONE else View.VISIBLE
+            if (deepJob == null) view.deepScan.text = getString(R.string.grab_deep, minOf(details.size, LinkGrabber.MAX_DETAILS))
+        }
 
         fun refresh() {
             view.title.text = getString(R.string.images_count, items.size)
@@ -698,17 +723,36 @@ class MainActivity : SecureActivity(),
             view.morePages.setOnClickListener {
                 view.morePages.isEnabled = false
                 crawlJob = lifecycleScope.launch {
-                    LinkGrabber(this@MainActivity, userAgent).crawl(crawlFrom) { page, found ->
+                    grabber.crawl(crawlFrom) { number, page ->
                         withContext(Dispatchers.Main) {
-                            val known = items.mapTo(HashSet()) { it.url }
-                            items.addAll(found.filter { it.url !in known && StorePolicy.allowsDownload(it.url, crawlFrom) })
-                            view.morePages.text = getString(R.string.grab_searching_page, page)
+                            addFound(page.items)
+                            details.addAll(page.details)
+                            view.morePages.text = getString(R.string.grab_searching_page, number)
+                            updateDeepButton()
                             adapter.notifyDataSetChanged()
                             refresh()
                         }
                     }
                     view.morePages.text = getString(R.string.grab_done)
                 }
+            }
+        }
+        // Análisis a fondo: abre la página de cada miniatura y coge su foto grande.
+        updateDeepButton()
+        view.deepScan.setOnClickListener {
+            if (deepJob != null) return@setOnClickListener
+            val pages = details.toList()
+            view.deepScan.isEnabled = false
+            deepJob = lifecycleScope.launch {
+                grabber.deep(pages) { done, item ->
+                    withContext(Dispatchers.Main) {
+                        if (item != null) addFound(listOf(item))
+                        view.deepScan.text = getString(R.string.grab_deep_progress, done, minOf(pages.size, LinkGrabber.MAX_DETAILS))
+                        adapter.notifyDataSetChanged()
+                        refresh()
+                    }
+                }
+                view.deepScan.text = getString(R.string.grab_deep_done)
             }
         }
         view.download.setOnClickListener {
@@ -718,6 +762,7 @@ class MainActivity : SecureActivity(),
         refresh()
         sheet.setOnDismissListener {
             crawlJob?.cancel()
+            deepJob?.cancel()
             loading.values.forEach { it.cancel() }
         }
         sheet.show()
@@ -729,11 +774,9 @@ class MainActivity : SecureActivity(),
         if (allowed.isEmpty()) return
         withDownloadNotice {
             val used = mutableSetOf<String>()
-            // Varias a la vez: carpeta de la web y, dentro, una con el nombre de la página.
-            val pageFolder = Vault.cleanName(pageTitle.take(60))
             allowed.forEachIndexed { i, item ->
-                val site = siteFolder(item.referer ?: tab?.url)
-                val folder = if (allowed.size > 1 && site.isNotEmpty()) Vault.join(site, pageFolder) else site
+                // Galería automática: carpeta de la web y, dentro, una con el nombre de la página.
+                val folder = Vault.galleryFolder(item.referer ?: tab?.url, item.album ?: pageTitle)
                 // Nombre del archivo en la web si lo tiene; si no, el título de la página numerado.
                 val fromUrl = URLUtil.guessFileName(item.url, null, null)
                     .takeIf { MediaSniffer.kindForExtension(MediaSniffer.extensionOf(item.url)) == item.kind }
@@ -747,6 +790,7 @@ class MainActivity : SecureActivity(),
                         userAgent = tab?.webView?.settings?.userAgentString ?: "",
                         fileName = name,
                         folder = folder,
+                        album = item.album ?: pageTitle,
                     )
                 )
             }
@@ -790,27 +834,30 @@ class MainActivity : SecureActivity(),
         Toast.makeText(this, R.string.grab_working, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             val found = mutableListOf<GrabItem>()
+            val details = mutableListOf<String>()
+            var title = ""
             urls.map { UrlUtils.upgradeToHttps(it) }.forEach { url ->
                 val direct = grabber.directItem(url)
-                if (direct != null) found.add(direct)
-                else grabber.crawl(url, maxPages = 1) { _, items -> found.addAll(items) }
+                if (direct != null) {
+                    found.add(direct)
+                } else {
+                    grabber.crawl(url, maxPages = 1) { _, page ->
+                        found.addAll(page.items)
+                        details.addAll(page.details)
+                        if (title.isEmpty()) title = page.title
+                    }
+                }
             }
-            val allowed = found.distinctBy { it.url }.filter { StorePolicy.allowsDownload(it.url, it.referer) }
-            if (allowed.isEmpty()) {
+            val allowed = LinkGrabber.dropSmallVariants(found.distinctBy { it.url })
+                .filter { StorePolicy.allowsDownload(it.url, it.referer) }
+            if (allowed.isEmpty() && details.isEmpty()) {
                 Toast.makeText(this@MainActivity, R.string.grab_nothing, Toast.LENGTH_LONG).show()
             } else {
                 // Si es una sola página, se puede seguir por sus páginas siguientes (galerías).
                 val single = urls.singleOrNull()?.takeIf { grabber.directItem(it) == null }?.let { UrlUtils.upgradeToHttps(it) }
-                showImagePicker(allowed, getString(R.string.app_name), single)
+                showImagePicker(allowed, title.ifBlank { getString(R.string.app_name) }, single, details.distinct())
             }
         }
-    }
-
-    /** Carpeta con el nombre de la web (sin «www.») donde se guarda lo descargado de ella. */
-    private fun siteFolder(pageUrl: String?): String {
-        val host = pageUrl?.takeIf { it.startsWith("http") }?.let { runCatching { Uri.parse(it).host }.getOrNull() }
-            ?: return ""
-        return Vault.cleanName(host.removePrefix("www."))
     }
 
     /** La primera vez que se descarga algo se muestra el aviso de derechos de autor. */
@@ -918,7 +965,9 @@ class MainActivity : SecureActivity(),
                 fileName = fileName,
                 audioUrl = audioUrl,
                 videoId = videoId,
-                folder = siteFolder(tab?.url),
+                // Las imágenes van a la galería «web/página»; vídeos y audios, a la carpeta de la web.
+                folder = Vault.galleryFolder(tab?.url, if (kind == MediaKind.IMAGE) baseTitle else null),
+                album = baseTitle,
             )
         )
         askNotificationPermission()

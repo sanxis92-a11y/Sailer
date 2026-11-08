@@ -60,6 +60,9 @@
     <string name="grab_more_pages">Search the next pages of the gallery</string>
     <string name="grab_searching_page">Searching… page %d</string>
     <string name="grab_done">All pages checked</string>
+    <string name="grab_deep">Deep scan: open %d gallery pages and get the large photos</string>
+    <string name="grab_deep_progress">Deep scan… %1$d of %2$d pages</string>
+    <string name="grab_deep_done">Deep scan finished</string>
     <string name="download_image">Download image</string>
     <string name="download_link">Download link</string>
     <string name="open_new_tab">Open in new tab</string>
@@ -151,6 +154,9 @@
     <string name="crash_message">An error report was saved on this phone only. If you want, copy it and send it so it can be fixed.</string>
     <string name="crash_copy">Copy report</string>
     <string name="crash_copied">Report copied</string>
+    <string name="vault_organize">Organize into galleries</string>
+    <string name="vault_organize_done">%d file(s) organized into galleries (website / page)</string>
+    <string name="vault_organize_none">There is nothing to organize here: only files downloaded with this version know which website and page they came from.</string>
     <string name="viewer_error">This file can\'t be opened</string>
 
     <!-- Lock -->

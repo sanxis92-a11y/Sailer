@@ -192,6 +192,10 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 R.id.action_cancel_paste -> { cutFiles.clear(); cutFolders.clear(); updateToolbar() }
                 R.id.action_details -> showDetails(selectedRows())
                 R.id.action_filter -> chooseFilter()
+                R.id.action_organize -> {
+                    val moved = vault.organize(folder)
+                    toast(if (moved > 0) getString(R.string.vault_organize_done, moved) else getString(R.string.vault_organize_none))
+                }
                 else -> return@setOnMenuItemClickListener false
             }
             true

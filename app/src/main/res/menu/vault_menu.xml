@@ -26,6 +26,10 @@
         app:iconTint="@color/text"
         app:showAsAction="ifRoom" />
     <item
+        android:id="@+id/action_organize"
+        android:title="@string/vault_organize"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_filter"
         android:title="@string/vault_filter"
         app:showAsAction="never" />
