@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_paste"
+        android:title="@string/vault_paste"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/vault_search"
+        app:actionViewClass="androidx.appcompat.widget.SearchView"
+        app:iconTint="@color/text"
+        app:showAsAction="ifRoom|collapseActionView" />
+    <item
+        android:id="@+id/action_sort"
+        android:icon="@drawable/ic_sort"
+        android:title="@string/vault_sort"
+        app:iconTint="@color/text"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_new_folder"
+        android:icon="@drawable/ic_new_folder"
+        android:title="@string/vault_new_folder"
+        app:iconTint="@color/text"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_organize"
+        android:title="@string/vault_organize"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_filter"
+        android:title="@string/vault_filter"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_cancel_paste"
+        android:title="@string/vault_cancel_paste"
+        android:visible="false"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_import"
+        android:title="@string/vault_import"
+        app:showAsAction="never" />
+</menu>

@@ -8,14 +8,9 @@
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@color/surface"
-        app:navigationIcon="@drawable/ic_back"
+        style="@style/SailerToolbar"
         app:subtitle="@string/vault_subtitle"
-        app:subtitleTextColor="@color/text_dim"
-        app:title="@string/menu_vault"
-        app:titleTextColor="@color/text" />
+        app:title="@string/menu_vault" />
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -25,17 +20,53 @@
             android:id="@+id/list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:divider="@color/field"
-            android:dividerHeight="1dp" />
+            android:clipToPadding="false"
+            android:divider="@color/stroke"
+            android:dividerHeight="1dp"
+            android:paddingBottom="96dp" />
 
-        <TextView
+        <LinearLayout
             android:id="@+id/empty"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:padding="32dp"
-            android:text="@string/vault_empty"
-            android:textColor="@color/text_dim"
-            android:textSize="15sp" />
+            style="@style/SailerEmptyState">
+
+            <ImageView
+                android:layout_width="88dp"
+                android:layout_height="88dp"
+                android:background="@drawable/bg_icon_circle"
+                android:contentDescription="@null"
+                android:padding="24dp"
+                android:src="@drawable/ic_folder"
+                app:tint="@color/accent" />
+
+            <TextView
+                android:id="@+id/emptyTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/vault_empty_title"
+                android:textColor="@color/text"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/emptyBody"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.2"
+                android:text="@string/vault_empty"
+                android:textColor="@color/text_dim"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/importButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="20dp"
+            android:text="@string/vault_import"
+            app:icon="@drawable/ic_add" />
     </FrameLayout>
 </LinearLayout>

@@ -1,5 +1,6 @@
 package com.sailer.browser.download
 
+import com.sailer.browser.Lang
 import android.content.Context
 import android.util.Base64
 import android.webkit.MimeTypeMap
@@ -37,6 +38,10 @@ data class DownloadRequest(
     val audioUrl: String? = null,
     /** Calidad de vídeo elegida en un manifiesto DASH. */
     val videoId: String? = null,
+    /** Carpeta de la carpeta segura donde se guarda (p. ej. el nombre de la web). */
+    val folder: String = "",
+    /** Título de la página o galería (para organizar después). */
+    val album: String = "",
 )
 
 /**
@@ -86,13 +91,13 @@ class Downloader(private val context: Context) {
             if (response.code == 416 && already > 0) {
                 // Ya estaba completo.
             } else {
-                if (!response.isSuccessful) throw IOException("Error del servidor (${response.code})")
+                if (!response.isSuccessful) throw IOException(Lang.t("Error del servidor (${response.code})", "Server error (${response.code})"))
                 if (response.code != 206 && already > 0) {
                     // El servidor no permite reanudar: empezar de cero.
                     part.delete()
                     already = 0
                 }
-                val body = response.body ?: throw IOException("Respuesta vacía")
+                val body = response.body ?: throw IOException(Lang.t("Respuesta vacía", "Empty response"))
                 body.contentType()?.let { "${it.type}/${it.subtype}" }
                     ?.takeUnless { it == "application/octet-stream" }
                     ?.let { state.mime = it }
@@ -130,7 +135,7 @@ class Downloader(private val context: Context) {
             ?: mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
             ?: urlExt
             ?: "bin"
-        return vault.adopt(part, fileName(request, ext), kind, mime)
+        return vault.adopt(part, fileName(request, ext), kind, mime, request.folder, request.referer.orEmpty(), request.album)
     }
 
     // ---- HLS y DASH (por trozos, se reanuda por el último trozo) ----
@@ -150,7 +155,7 @@ class Downloader(private val context: Context) {
         val audio = plan.audio
         if (audio == null) {
             val ext = plan.video.extension
-            return vault.adopt(videoPart, fileName(request, ext), if (audioOnly) MediaKind.AUDIO else MediaKind.VIDEO, mimeFor(ext))
+            return vault.adopt(videoPart, fileName(request, ext), if (audioOnly) MediaKind.AUDIO else MediaKind.VIDEO, mimeFor(ext), request.folder, request.referer.orEmpty(), request.album)
         }
 
         // Vídeo y audio separados: unirlos en un solo archivo.
@@ -162,7 +167,7 @@ class Downloader(private val context: Context) {
             val writer = vault.newWriter()
             try {
                 muxed.inputStream().use { it.copyTo(writer.output, 256 * 1024) }
-                writer.commit(fileName(request, ext), MediaKind.VIDEO, mimeFor(ext))
+                writer.commit(fileName(request, ext), MediaKind.VIDEO, mimeFor(ext), folder = request.folder, source = request.referer.orEmpty(), album = request.album)
             } catch (e: Throwable) {
                 writer.abort()
                 throw e
@@ -170,8 +175,8 @@ class Downloader(private val context: Context) {
         } catch (e: Exception) {
             // Si no se pueden unir (formato raro), se guardan las dos pistas por separado.
             muxed.delete()
-            vault.adopt(audioPart, fileName(request, audio.extension, " (audio)"), MediaKind.AUDIO, mimeFor(audio.extension))
-            vault.adopt(videoPart, fileName(request, plan.video.extension, " (vídeo)"), MediaKind.VIDEO, mimeFor(plan.video.extension))
+            vault.adopt(audioPart, fileName(request, audio.extension, " (audio)"), MediaKind.AUDIO, mimeFor(audio.extension), request.folder, request.referer.orEmpty(), request.album)
+            vault.adopt(videoPart, fileName(request, plan.video.extension, Lang.t(" (vídeo)", " (video)")), MediaKind.VIDEO, mimeFor(plan.video.extension), request.folder, request.referer.orEmpty(), request.album)
         } finally {
             muxed.delete()
         }
@@ -231,14 +236,14 @@ class Downloader(private val context: Context) {
         repeat(3) {
             try {
                 client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) throw IOException("Error del servidor (${response.code})")
-                    return response.body?.bytes() ?: throw IOException("Respuesta vacía")
+                    if (!response.isSuccessful) throw IOException(Lang.t("Error del servidor (${response.code})", "Server error (${response.code})"))
+                    return response.body?.bytes() ?: throw IOException(Lang.t("Respuesta vacía", "Empty response"))
                 }
             } catch (e: IOException) {
                 lastError = e
             }
         }
-        throw lastError ?: IOException("Error de descarga")
+        throw lastError ?: IOException(Lang.t("Error de descarga", "Download error"))
     }
 
     // ---- Imágenes incrustadas (data:) ----
@@ -256,7 +261,7 @@ class Downloader(private val context: Context) {
         try {
             writer.output.write(bytes)
             val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "bin"
-            return writer.commit(fileName(request, ext), MediaSniffer.kindForMime(mime) ?: MediaKind.FILE, mime)
+            return writer.commit(fileName(request, ext), MediaSniffer.kindForMime(mime) ?: MediaKind.FILE, mime, folder = request.folder, source = request.referer.orEmpty(), album = request.album)
         } catch (e: Throwable) {
             writer.abort()
             throw e

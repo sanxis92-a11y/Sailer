@@ -8,12 +8,8 @@
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@color/surface"
-        app:navigationIcon="@drawable/ic_back"
-        app:title="@string/menu_settings"
-        app:titleTextColor="@color/text" />
+        style="@style/SailerToolbar"
+        app:title="@string/menu_settings" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -23,82 +19,119 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="24dp">
 
             <TextView style="@style/SailerSectionTitle" android:text="@string/settings_section_privacy" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchAdblock"
-                style="@style/SailerSwitch"
-                android:text="@string/settings_adblock" />
+            <LinearLayout style="@style/SailerCard">
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchAdblock"
+                    style="@style/SailerSwitch"
+                    android:text="@string/settings_adblock" />
 
-            <TextView style="@style/SailerHint" android:text="@string/settings_adblock_help" />
+                <TextView style="@style/SailerHint" android:text="@string/settings_adblock_help" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchDoh"
-                style="@style/SailerSwitch"
-                android:text="@string/settings_doh" />
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchDoh"
+                    style="@style/SailerSwitch"
+                    android:text="@string/settings_doh" />
 
-            <TextView style="@style/SailerHint" android:text="@string/settings_doh_help" />
+                <TextView style="@style/SailerHint" android:text="@string/settings_doh_help" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/privateDns"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_private_dns" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/privateDns"
+                    style="@style/SailerTonalButton"
+                    app:icon="@drawable/ic_dns"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_private_dns" />
+            </LinearLayout>
 
             <TextView style="@style/SailerSectionTitle" android:text="@string/settings_section_lock" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchDisguise"
-                style="@style/SailerSwitch"
-                android:text="@string/settings_disguise" />
+            <LinearLayout style="@style/SailerCard">
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchDisguise"
+                    style="@style/SailerSwitch"
+                    android:text="@string/settings_disguise" />
 
-            <TextView style="@style/SailerHint" android:text="@string/settings_disguise_help" />
+                <TextView
+                    android:id="@+id/disguiseHelp"
+                    style="@style/SailerHint"
+                    android:text="@string/settings_disguise_help" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchLock"
-                style="@style/SailerSwitch"
-                android:text="@string/settings_lock" />
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchLock"
+                    style="@style/SailerSwitch"
+                    android:text="@string/settings_lock" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchBiometric"
-                style="@style/SailerSwitch"
-                android:text="@string/settings_biometric" />
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchBiometric"
+                    style="@style/SailerSwitch"
+                    android:text="@string/settings_biometric" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/changePin"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/settings_change_pin" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/changePin"
+                    style="@style/SailerTonalButton"
+                    app:icon="@drawable/ic_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_change_pin" />
+            </LinearLayout>
 
             <TextView style="@style/SailerSectionTitle" android:text="@string/backup_section" />
 
-            <TextView style="@style/SailerHint" android:text="@string/backup_help" />
+            <LinearLayout style="@style/SailerCard">
+                <TextView style="@style/SailerHint" android:text="@string/backup_help" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/backupExport"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/backup_export" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/backupExport"
+                    style="@style/SailerTonalButton"
+                    app:icon="@drawable/ic_upload"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/backup_export" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/backupImport"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/backup_import" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/backupImport"
+                    style="@style/SailerTonalButton"
+                    app:icon="@drawable/ic_download"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/backup_import" />
+            </LinearLayout>
+
+            <TextView style="@style/SailerSectionTitle" android:text="@string/settings_section_about" />
+
+            <LinearLayout style="@style/SailerCard">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/privacyPolicy"
+                    style="@style/SailerTonalButton"
+                    app:icon="@drawable/ic_policy"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_privacy_policy" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/licenses"
+                    style="@style/SailerTonalButton"
+                    app:icon="@drawable/ic_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_licenses" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/version"
                 style="@style/SailerHint"
                 android:layout_marginTop="32dp"
+                android:layout_marginEnd="0dp"
                 android:gravity="center" />
         </LinearLayout>
     </ScrollView>

@@ -5,14 +5,40 @@ plugins {
 
 android {
     namespace = "com.sailer.browser"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.sailer.browser"
+        applicationId = "com.nauvel.browser"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 5
-        versionName = "1.3.0"
+        targetSdk = 36
+        versionCode = 6
+        versionName = "1.4.0"
+    }
+
+    // Dos versiones de la app:
+    //  - full: la completa, para instalar desde GitHub (APK).
+    //  - play: la de Google Play. Sin descargas de YouTube ni plataformas
+    //    de pago y con aviso de derechos de autor.
+    flavorDimensions += "store"
+    productFlavors {
+        create("full") {
+            dimension = "store"
+            // Nombre distinto al de Play para que las dos versiones puedan convivir.
+            applicationIdSuffix = ".full"
+            buildConfigField("boolean", "STREAM_DOWNLOADS", "true")
+            buildConfigField("boolean", "DISGUISE", "true")
+            // Lista de imágenes, galerías de varias páginas y recolector de enlaces (solo uso personal).
+            buildConfigField("boolean", "GRABBER", "true")
+        }
+        create("play") {
+            dimension = "store"
+            // Descargador incluido, pero con webs bloqueadas (ver media/StorePolicy).
+            buildConfigField("boolean", "STREAM_DOWNLOADS", "true")
+            // Disimulo con calculadora funcional. Si Google lo rechazara, poner "false"
+            // y quitar el icono .LauncherCalculator en src/play/AndroidManifest.xml.
+            buildConfigField("boolean", "DISGUISE", "true")
+            buildConfigField("boolean", "GRABBER", "false")
+        }
     }
 
     signingConfigs {

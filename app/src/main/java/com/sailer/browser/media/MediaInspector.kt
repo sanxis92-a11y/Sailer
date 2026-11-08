@@ -1,5 +1,6 @@
 package com.sailer.browser.media
 
+import com.sailer.browser.Lang
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -148,7 +149,7 @@ class MediaInspector(private val context: Context) {
             val text = fetchText(item.url, headers)
             if (HlsPlaylist.isMaster(text)) {
                 val variants = HlsPlaylist.variants(item.url, text)
-                if (variants.isEmpty()) throw IOException("Sin calidades")
+                if (variants.isEmpty()) throw IOException(Lang.t("Sin calidades", "No qualities found"))
                 val best = variants.maxBy { it.bandwidth }
                 val bestText = runCatching { fetchText(best.url, headers) }.getOrNull()
                 val duration = bestText?.let { HlsPlaylist.durationSeconds(it) }?.takeIf { it > 0 } ?: pageDuration

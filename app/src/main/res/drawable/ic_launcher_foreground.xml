@@ -1,11 +1,13 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Vela de barco estilizada -->
+    <!-- Velero: vela mayor, foque, mástil y casco -->
     <path android:fillColor="#FFFFFFFF"
-        android:pathData="M52,30 L52,70 L32,70 Z" />
-    <path android:fillColor="#FFD9CFFF"
-        android:pathData="M56,26 L56,70 L78,70 Z" />
+        android:pathData="M52,27 L52,66 L29,66 Q40,50 52,27 Z" />
+    <path android:fillColor="#FFD6CEFF"
+        android:pathData="M56,33 L56,66 L77,66 Q70,49 56,33 Z" />
     <path android:fillColor="#FFFFFFFF"
-        android:pathData="M30,74 L80,74 L72,82 L38,82 Z" />
+        android:pathData="M53,24 L55,24 L55,69 L53,69 Z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M31,70 L77,70 Q74,79 65,81 L43,81 Q34,79 31,70 Z" />
 </vector>

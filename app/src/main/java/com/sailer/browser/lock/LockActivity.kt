@@ -9,6 +9,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import com.sailer.browser.R
 import com.sailer.browser.databinding.ActivityLockBinding
+import com.sailer.browser.settings.Disguise
 import com.sailer.browser.settings.Prefs
 
 class LockActivity : SecureActivity() {
@@ -20,9 +21,30 @@ class LockActivity : SecureActivity() {
     /** Modo "comprobar PIN" (p. ej. para abrir los favoritos) sin tocar el bloqueo general. */
     private val verifyOnly by lazy { intent.getBooleanExtra(EXTRA_VERIFY, false) }
 
+    /** Con el disimulo activado, el bloqueo es una calculadora: PIN y luego «=». */
+    private val asCalculator by lazy { !verifyOnly && Disguise.isEnabled(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLockBinding.inflate(layoutInflater)
+        val canUseBiometric = Prefs.get(this).biometricEnabled && isBiometricAvailable(this)
+        if (asCalculator) {
+            val calculator = CalculatorScreen(
+                this,
+                onPinEntered = { pin ->
+                    // Un PIN incorrecto no muestra nada: la calculadora sigue como si tal cosa.
+                    AppLock.lockoutRemaining(this) == 0L && AppLock.checkPin(this, pin).also { if (it) unlock() }
+                },
+                onBiometric = if (canUseBiometric) ({ showBiometricPrompt() }) else null,
+            )
+            setContentView(calculator.view)
+            onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    moveTaskToBack(true)
+                }
+            })
+            return
+        }
         setContentView(binding.root)
 
         binding.unlockButton.setOnClickListener { tryPin() }
@@ -35,7 +57,6 @@ class LockActivity : SecureActivity() {
             }
         }
 
-        val canUseBiometric = Prefs.get(this).biometricEnabled && isBiometricAvailable(this)
         binding.biometricButton.visibility = if (canUseBiometric) View.VISIBLE else View.GONE
         binding.biometricButton.setOnClickListener { showBiometricPrompt() }
         if (canUseBiometric && savedInstanceState == null) showBiometricPrompt()
@@ -51,7 +72,7 @@ class LockActivity : SecureActivity() {
     override fun onResume() {
         super.onResume()
         if (!verifyOnly && !AppLock.isLocked) finish()
-        showLockout()
+        if (!asCalculator) showLockout()
     }
 
     private fun tryPin() {

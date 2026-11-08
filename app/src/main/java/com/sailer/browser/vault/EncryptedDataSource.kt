@@ -1,5 +1,6 @@
 package com.sailer.browser.vault
 
+import com.sailer.browser.Lang
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.C
@@ -22,9 +23,9 @@ class EncryptedDataSource(private val crypto: VaultCrypto) : BaseDataSource(fals
     override fun open(dataSpec: DataSpec): Long {
         uri = dataSpec.uri
         transferInitializing(dataSpec)
-        val file = File(dataSpec.uri.path ?: throw IOException("Ruta no válida"))
+        val file = File(dataSpec.uri.path ?: throw IOException(Lang.t("Ruta no válida", "Invalid path")))
         val plainLength = crypto.plainLength(file)
-        if (dataSpec.position > plainLength) throw IOException("Posición fuera del archivo")
+        if (dataSpec.position > plainLength) throw IOException(Lang.t("Posición fuera del archivo", "Position outside the file"))
         input = crypto.decryptFrom(file, dataSpec.position)
         val available = plainLength - dataSpec.position
         remaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) minOf(dataSpec.length, available) else available

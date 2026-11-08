@@ -54,9 +54,16 @@ class DownloadService : Service(), DownloadCenter.Listener {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /** Android 15 limita el tiempo de este tipo de servicio; si no se para a tiempo, cierra la app. */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        DownloadCenter.pauseAll()
+        stop()
+    }
+
     private fun goForeground() {
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), type)
+        runCatching { ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), type) }
+            .onFailure { stopSelf() }
     }
 
     private fun stop() {
@@ -97,7 +104,8 @@ class DownloadService : Service(), DownloadCenter.Listener {
         private const val ACTION_PAUSE_ALL = "com.sailer.browser.PAUSE_ALL"
 
         fun start(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, DownloadService::class.java))
+            // Android 12+ no deja arrancarlo con la app en segundo plano: antes eso cerraba la app.
+            runCatching { ContextCompat.startForegroundService(context, Intent(context, DownloadService::class.java)) }
         }
     }
 }

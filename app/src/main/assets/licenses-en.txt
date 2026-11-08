@@ -1,0 +1,20 @@
+Nauvel is free software under the GNU GPL v3.0. Its source code is at https://github.com/sanxis92-a11y/sailer
+
+Nauvel uses these third-party libraries and lists. Thanks to their authors.
+
+LIBRARIES
+• AndroidX (Core, AppCompat, Activity, WebKit, Biometric, Lifecycle, Media3) — The Android Open Source Project — Apache License 2.0
+• Material Components for Android — Google — Apache License 2.0
+• Kotlin and kotlinx.coroutines — JetBrains — Apache License 2.0
+• OkHttp and okhttp-dnsoverhttps — Square, Inc. — Apache License 2.0
+
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+BLOCK LISTS
+• HaGeZi DNS Blocklists (Multi PRO++) — https://github.com/hagezi/dns-blocklists — GNU GPL v3.0
+• EasyList, EasyPrivacy and EasyList supplementary lists — https://easylist.to — GNU GPL v3.0 / Creative Commons BY-SA 3.0
+
+The lists have been converted to a compact format (domain hashes and selectors) with no other changes to their content. The originals are available at the addresses above.
+
+GNU GPL v3.0: https://www.gnu.org/licenses/gpl-3.0.html
+CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/

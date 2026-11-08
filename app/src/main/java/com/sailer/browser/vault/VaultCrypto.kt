@@ -1,5 +1,6 @@
 package com.sailer.browser.vault
 
+import com.sailer.browser.Lang
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -115,7 +116,7 @@ class VaultCrypto(context: Context) {
             return cipher.doFinal(data, start, data.size - start)
         }
         // Formato antiguo (AES-CTR).
-        if (data.size < HEADER) throw IOException("Datos dañados")
+        if (data.size < HEADER) throw IOException(Lang.t("Datos dañados", "Damaged data"))
         return ctr(data.copyOfRange(0, HEADER), 0).doFinal(data, HEADER, data.size - HEADER)
     }
 
@@ -197,14 +198,14 @@ class VaultCrypto(context: Context) {
             val body = fileLength - HEADER
             segmentCount = (body + FULL_SEGMENT - 1) / FULL_SEGMENT
             length = body - segmentCount * OVERHEAD
-            if (segmentCount <= 0 || length < 0) throw IOException("Archivo dañado")
+            if (segmentCount <= 0 || length < 0) throw IOException(Lang.t("Archivo dañado", "Damaged file"))
         }
 
         fun segment(index: Long): ByteArray {
             if (index == cachedIndex) return cached
             val start = HEADER + index * FULL_SEGMENT
             val size = minOf(FULL_SEGMENT.toLong(), fileLength - start).toInt()
-            if (size < OVERHEAD) throw IOException("Archivo dañado")
+            if (size < OVERHEAD) throw IOException(Lang.t("Archivo dañado", "Damaged file"))
             val data = ByteArray(size)
             synchronized(raf) {
                 raf.seek(start)
@@ -301,7 +302,7 @@ class VaultCrypto(context: Context) {
             var read = 0
             while (read < target.size) {
                 val n = input.read(target, read, target.size - read)
-                if (n < 0) throw IOException("Archivo dañado")
+                if (n < 0) throw IOException(Lang.t("Archivo dañado", "Damaged file"))
                 read += n
             }
         }

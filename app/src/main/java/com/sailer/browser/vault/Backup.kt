@@ -1,5 +1,6 @@
 package com.sailer.browser.vault
 
+import com.sailer.browser.Lang
 import android.content.Context
 import com.sailer.browser.media.MediaKind
 import java.io.DataInputStream
@@ -29,7 +30,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 object Backup {
 
-    class WrongPasswordException : IOException("Contraseña incorrecta o archivo dañado")
+    class WrongPasswordException : IOException(Lang.t("Contraseña incorrecta o archivo dañado", "Wrong password or damaged file"))
 
     data class Result(val files: Int, val bookmarks: Int)
 
@@ -37,7 +38,8 @@ object Backup {
     private const val ITERATIONS = 310_000
     private const val SEGMENT = 64 * 1024
     private const val NONCE = 12
-    private const val FORMAT = 1
+    /** 1 = sin carpetas; 2 = con carpetas. Se siguen pudiendo leer las dos. */
+    private const val FORMAT = 3
     private val random = SecureRandom()
 
     /** Escribe la copia en [target]. [onProgress] recibe (hechos, total). */
@@ -57,6 +59,9 @@ object Backup {
                 writeText(out, it.url)
                 out.writeLong(it.created)
             }
+            val folders = vault.allFolders()
+            out.writeInt(folders.size)
+            folders.forEach { writeText(out, it) }
             out.writeInt(entries.size)
             entries.forEachIndexed { i, entry ->
                 onProgress(i, entries.size)
@@ -64,6 +69,9 @@ object Backup {
                 writeText(out, entry.name)
                 writeText(out, entry.kind.name)
                 writeText(out, entry.mime ?: "")
+                writeText(out, entry.folder)
+                writeText(out, entry.source)
+                writeText(out, entry.album)
                 out.writeLong(entry.created)
                 out.writeLong(size)
                 vault.openInput(entry).use { input -> copyExactly(input, out, size) }
@@ -79,20 +87,21 @@ object Backup {
         try {
             DataInputStream(source).readFully(header)
         } catch (e: EOFException) {
-            throw IOException("No es una copia de Sailer")
+            throw IOException(Lang.t("No es una copia de Nauvel", "Not a Nauvel backup"))
         }
         val buffer = ByteBuffer.wrap(header)
         val magic = ByteArray(MAGIC.size).also { buffer.get(it) }
-        if (!magic.contentEquals(MAGIC)) throw IOException("No es una copia de Sailer")
+        if (!magic.contentEquals(MAGIC)) throw IOException(Lang.t("No es una copia de Nauvel", "Not a Nauvel backup"))
         val salt = ByteArray(16).also { buffer.get(it) }
         val iterations = buffer.int
-        if (iterations !in 10_000..10_000_000) throw IOException("No es una copia de Sailer")
+        if (iterations !in 10_000..10_000_000) throw IOException(Lang.t("No es una copia de Nauvel", "Not a Nauvel backup"))
         val key = deriveKey(password, salt, iterations)
 
         val vault = Vault.get(context)
         val bookmarksStore = Bookmarks.get(context)
         DataInputStream(OpenInput(source, key, header).buffered(SEGMENT)).use { input ->
-            if (input.readInt() != FORMAT) throw IOException("Versión de copia no compatible")
+            val format = input.readInt()
+            if (format !in 1..FORMAT) throw IOException(Lang.t("Versión de copia no compatible", "Unsupported backup version"))
             val bookmarkCount = input.readInt()
             repeat(bookmarkCount) {
                 val title = readText(input)
@@ -100,18 +109,22 @@ object Backup {
                 input.readLong()
                 bookmarksStore.add(title, url)
             }
+            if (format >= 2) repeat(input.readInt()) { vault.ensureFolder(readText(input)) }
             val count = input.readInt()
             for (i in 0 until count) {
                 onProgress(i, count)
                 val name = readText(input)
                 val kind = runCatching { MediaKind.valueOf(readText(input)) }.getOrDefault(MediaKind.FILE)
                 val mime = readText(input).ifEmpty { null }
+                val folder = if (format >= 2) readText(input) else ""
+                val source = if (format >= 3) readText(input) else ""
+                val album = if (format >= 3) readText(input) else ""
                 val created = input.readLong()
                 val size = input.readLong()
                 val writer = vault.newWriter()
                 try {
                     copyExactly(input, writer.output, size)
-                    writer.commit(name, kind, mime, created)
+                    writer.commit(name, kind, mime, created, folder, source, album)
                 } catch (e: Exception) {
                     writer.abort()
                     throw e
@@ -143,7 +156,7 @@ object Backup {
 
     private fun readText(input: DataInputStream): String {
         val size = input.readInt()
-        if (size !in 0..1_000_000) throw IOException("Copia dañada")
+        if (size !in 0..1_000_000) throw IOException(Lang.t("Copia dañada", "Damaged backup"))
         return ByteArray(size).also { input.readFully(it) }.toString(Charsets.UTF_8)
     }
 
@@ -152,7 +165,7 @@ object Backup {
         var remaining = size
         while (remaining > 0) {
             val n = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
-            if (n < 0) throw IOException("Copia incompleta")
+            if (n < 0) throw IOException(Lang.t("Copia incompleta", "Incomplete backup"))
             out.write(buffer, 0, n)
             remaining -= n
         }
@@ -243,7 +256,7 @@ object Backup {
             val size = try {
                 input.readInt()
             } catch (e: EOFException) {
-                throw IOException("Copia incompleta")
+                throw IOException(Lang.t("Copia incompleta", "Incomplete backup"))
             }
             if (size !in 16..SEGMENT + 16) throw WrongPasswordException()
             val nonce = ByteArray(NONCE).also { input.readFully(it) }

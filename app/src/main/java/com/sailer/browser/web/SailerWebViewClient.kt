@@ -2,6 +2,7 @@ package com.sailer.browser.web
 
 import android.graphics.Bitmap
 import android.net.http.SslError
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -23,6 +24,9 @@ class SailerWebViewClient(
 
         /** Se llama (en segundo plano) por cada recurso que carga la página. */
         fun onResourceRequest(view: WebView, request: WebResourceRequest)
+
+        /** El motor de la página se ha cerrado (falta de memoria o fallo de la web). */
+        fun onRendererGone(view: WebView)
     }
 
     enum class BlockReason { INSECURE_HTTP, BAD_CERTIFICATE }
@@ -73,6 +77,15 @@ class SailerWebViewClient(
             blockedCount.set(0)
         }
         callbacks.onPageStarted(view, url)
+    }
+
+    /**
+     * Sin esto, cuando una web pesada hace caer el motor de páginas, Android
+     * cierra toda la app. Así solo se recarga esa pestaña.
+     */
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        callbacks.onRendererGone(view)
+        return true
     }
 
     override fun onPageFinished(view: WebView, url: String) {

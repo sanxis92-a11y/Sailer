@@ -56,7 +56,14 @@ class SailerChromeClient(
                 val allowed = tappedLink != null && sameAddress(target, tappedLink) &&
                     !requestFilter.shouldBlockNavigation(Uri.parse(target), pageHost)
                 if (allowed) callbacks.onOpenInNewTab(UrlUtils.upgradeToHttps(target)) else callbacks.onPopupBlocked(view)
-                probe.post { probe.destroy() }
+                probe.post { runCatching { probe.destroy() } }
+            }
+
+            // Si el motor de páginas se cae, todo WebView debe atenderlo o Android cierra la app.
+            override fun onRenderProcessGone(v: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
+                decided = true
+                runCatching { v.destroy() }
+                return true
             }
 
             override fun shouldOverrideUrlLoading(v: WebView, request: android.webkit.WebResourceRequest): Boolean {
