@@ -7,6 +7,7 @@
     <item android:id="@+id/action_tabs" android:icon="@drawable/ic_tabs" android:iconTint="@color/text_dim" android:title="@string/menu_tabs" />
     <item android:id="@+id/action_adblock_site" android:icon="@drawable/ic_shield" android:iconTint="@color/text_dim" android:title="@string/adblock_site_on" />
     <item android:id="@+id/action_media" android:icon="@drawable/ic_download" android:iconTint="@color/text_dim" android:title="@string/menu_media" />
+    <item android:id="@+id/action_grab_links" android:icon="@drawable/ic_download" android:iconTint="@color/text_dim" android:title="@string/menu_grab_links" />
     <item android:id="@+id/action_add_bookmark" android:icon="@drawable/ic_star" android:iconTint="@color/text_dim" android:title="@string/menu_add_bookmark" />
     <item android:id="@+id/action_bookmarks" android:icon="@drawable/ic_bookmarks" android:iconTint="@color/text_dim" android:title="@string/menu_bookmarks" />
     <item android:id="@+id/action_vault" android:icon="@drawable/ic_folder" android:iconTint="@color/text_dim" android:title="@string/menu_vault" />

@@ -27,8 +27,8 @@ android {
             applicationIdSuffix = ".full"
             buildConfigField("boolean", "STREAM_DOWNLOADS", "true")
             buildConfigField("boolean", "DISGUISE", "true")
-            // Lista de imágenes de la página para bajar varias a la vez (solo uso personal).
-            buildConfigField("boolean", "IMAGE_GRABBER", "true")
+            // Lista de imágenes, galerías de varias páginas y recolector de enlaces (solo uso personal).
+            buildConfigField("boolean", "GRABBER", "true")
         }
         create("play") {
             dimension = "store"
@@ -37,7 +37,7 @@ android {
             // Disimulo con calculadora funcional. Si Google lo rechazara, poner "false"
             // y quitar el icono .LauncherCalculator en src/play/AndroidManifest.xml.
             buildConfigField("boolean", "DISGUISE", "true")
-            buildConfigField("boolean", "IMAGE_GRABBER", "false")
+            buildConfigField("boolean", "GRABBER", "false")
         }
     }
 

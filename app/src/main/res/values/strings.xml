@@ -49,6 +49,17 @@
     <string name="images_download">Download %d</string>
     <string name="images_download_none">Choose images</string>
     <string name="images_started">Downloading %d images to the secure folder…</string>
+    <string name="menu_grab_links">Link collector</string>
+    <string name="grab_title">Link collector</string>
+    <string name="grab_message">Paste one or more links. Nauvel finds every image, video and audio file behind them.</string>
+    <string name="grab_hint">https://…</string>
+    <string name="grab_search">Search</string>
+    <string name="grab_no_links">There are no links in the text.</string>
+    <string name="grab_working">Searching the links…</string>
+    <string name="grab_nothing">Nothing downloadable was found in those links.</string>
+    <string name="grab_more_pages">Search the next pages of the gallery</string>
+    <string name="grab_searching_page">Searching… page %d</string>
+    <string name="grab_done">All pages checked</string>
     <string name="download_image">Download image</string>
     <string name="download_link">Download link</string>
     <string name="open_new_tab">Open in new tab</string>

@@ -1,6 +1,7 @@
 package com.sailer.browser
 
 import android.Manifest
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -12,6 +13,8 @@ import android.os.Bundle
 import android.text.format.Formatter
 import android.view.WindowManager
 import android.webkit.URLUtil
+import android.webkit.WebSettings
+import android.widget.EditText
 import android.webkit.WebResourceRequest
 import android.view.KeyEvent
 import android.view.View
@@ -42,7 +45,9 @@ import com.sailer.browser.media.MediaElementInfo
 import com.sailer.browser.media.MediaInspector
 import com.sailer.browser.media.StorePolicy
 import com.sailer.browser.media.MediaOption
+import com.sailer.browser.media.GrabItem
 import com.sailer.browser.media.PageImage
+import com.sailer.browser.media.LinkGrabber
 import com.sailer.browser.media.PageMediaInfo
 import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.databinding.ActivityMainBinding
@@ -68,7 +73,9 @@ import com.sailer.browser.vault.VaultActivity
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -204,6 +211,7 @@ class MainActivity : SecureActivity(),
             menu.findItem(R.id.action_forward).isEnabled = tabManager.current?.webView?.canGoForward() == true
             val client = tabManager.current?.webView?.webViewClient as? SailerWebViewClient
             val siteItem = menu.findItem(R.id.action_adblock_site)
+            menu.findItem(R.id.action_grab_links).isVisible = BuildConfig.GRABBER
             siteItem.isVisible = AdBlocker.enabled && client?.pageHost != null
             siteItem.title = if (AdBlocker.isAllowedSite(client?.pageHost)) {
                 getString(R.string.adblock_site_on)
@@ -219,6 +227,7 @@ class MainActivity : SecureActivity(),
                     R.id.action_tabs -> showTabs()
                     R.id.action_adblock_site -> toggleAdBlockForSite()
                     R.id.action_media -> showMedia()
+                    R.id.action_grab_links -> showLinkCollector()
                     R.id.action_add_bookmark -> addBookmark()
                     R.id.action_bookmarks ->
                         bookmarksLauncher.launch(Intent(this@MainActivity, BookmarksActivity::class.java))
@@ -466,11 +475,16 @@ class MainActivity : SecureActivity(),
         view.pageTitle.text = pageTitle
         sheet.show()
 
-        val images = if (BuildConfig.IMAGE_GRABBER) info.images.filter { StorePolicy.allowsDownload(it.url, tab.url) } else emptyList()
+        val images = if (BuildConfig.GRABBER) {
+            info.images.filter { StorePolicy.allowsDownload(it.url, tab.url) }
+                .map { GrabItem(it.url, MediaKind.IMAGE, it.width, it.height, tab.url) }
+        } else {
+            emptyList()
+        }
         if (images.isNotEmpty()) {
             view.options.addView(imagesRow(view, images.size) {
                 sheet.dismiss()
-                showImagePicker(tab, images, pageTitle)
+                showImagePicker(images, pageTitle, tab.url.takeIf { it.startsWith("https://") })
             })
         }
 
@@ -566,97 +580,129 @@ class MainActivity : SecureActivity(),
         return row.root
     }
 
-    /** Cuadrícula con las imágenes de la página: se marcan las que se quieren y se bajan todas juntas. */
-    private fun showImagePicker(tab: Tab, images: List<PageImage>, pageTitle: String) {
+    /**
+     * Cuadrícula con lo encontrado (imágenes, y vídeos/audios del recolector):
+     * se marcan las que se quieren y se bajan todas juntas. Con [crawlFrom], el
+     * botón «Buscar en más páginas» recorre la galería siguiendo «Siguiente».
+     */
+    private fun showImagePicker(initial: List<GrabItem>, pageTitle: String, crawlFrom: String?) {
         val sheet = BottomSheetDialog(this)
         sheet.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val view = SheetImagesBinding.inflate(layoutInflater)
         sheet.setContentView(view.root)
-        view.title.text = getString(R.string.images_count, images.size)
 
+        val items = initial.distinctBy { it.url }.toMutableList()
         val selected = linkedSetOf<String>()
-        val userAgent = tab.webView.settings.userAgentString
-        val referer = tab.url
+        val userAgent = tabManager.current?.webView?.settings?.userAgentString ?: WebSettings.getDefaultUserAgent(this)
         val inspector = MediaInspector(this)
         val cache = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
             override fun sizeOf(key: String, value: Bitmap) = value.byteCount
         }
         val loading = mutableMapOf<String, Job>()
         val limit = Semaphore(4)
+        var crawlJob: Job? = null
 
         fun refresh() {
+            view.title.text = getString(R.string.images_count, items.size)
             view.download.isEnabled = selected.isNotEmpty()
             view.download.text = if (selected.isEmpty()) getString(R.string.images_download_none)
             else getString(R.string.images_download, selected.size)
-            view.selectAll.setText(if (selected.size == images.size) R.string.images_select_none else R.string.images_select_all)
+            view.selectAll.setText(if (selected.size == items.size && items.isNotEmpty()) R.string.images_select_none else R.string.images_select_all)
         }
 
         val adapter = object : BaseAdapter() {
-            override fun getCount() = images.size
-            override fun getItem(position: Int) = images[position]
+            override fun getCount() = items.size
+            override fun getItem(position: Int) = items[position]
             override fun getItemId(position: Int) = position.toLong()
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val item = convertView?.let { ItemImageBinding.bind(it) } ?: ItemImageBinding.inflate(layoutInflater, parent, false)
-                val image = images[position]
-                item.root.tag = image.url
-                item.size.text = if (image.width > 0 && image.height > 0) "${image.width}×${image.height}" else ""
-                item.size.visibility = if (item.size.text.isEmpty()) View.GONE else View.VISIBLE
-                val isSelected = image.url in selected
-                item.check.visibility = if (isSelected) View.VISIBLE else View.GONE
-                item.frame.setBackgroundColor(ContextCompat.getColor(this@MainActivity, if (isSelected) R.color.accent else R.color.field))
-                val bitmap = cache.get(image.url)
-                item.image.setImageBitmap(bitmap)
-                if (bitmap == null && image.url !in loading) {
-                    loading[image.url] = lifecycleScope.launch {
-                        val loaded = limit.withPermit { inspector.loadThumbnail(image.url, referer, userAgent) }
-                        loading.remove(image.url)
+                val cell = convertView?.let { ItemImageBinding.bind(it) } ?: ItemImageBinding.inflate(layoutInflater, parent, false)
+                val item = items[position]
+                val isImage = item.kind == MediaKind.IMAGE
+                cell.size.text = when {
+                    item.width > 0 && item.height > 0 -> "${item.width}×${item.height}"
+                    !isImage -> URLUtil.guessFileName(item.url, null, null).take(24)
+                    else -> ""
+                }
+                cell.size.visibility = if (cell.size.text.isEmpty()) View.GONE else View.VISIBLE
+                cell.icon.visibility = if (isImage) View.GONE else View.VISIBLE
+                cell.icon.text = if (item.kind == MediaKind.AUDIO) "🎵" else "🎬"
+                val isSelected = item.url in selected
+                cell.check.visibility = if (isSelected) View.VISIBLE else View.GONE
+                cell.frame.setBackgroundColor(ContextCompat.getColor(this@MainActivity, if (isSelected) R.color.accent else R.color.field))
+                val bitmap = if (isImage) cache.get(item.url) else null
+                cell.image.setImageBitmap(bitmap)
+                if (isImage && bitmap == null && item.url !in loading) {
+                    loading[item.url] = lifecycleScope.launch {
+                        val loaded = limit.withPermit { inspector.loadThumbnail(item.url, item.referer, userAgent) }
+                        loading.remove(item.url)
                         if (loaded != null) {
-                            cache.put(image.url, loaded)
+                            cache.put(item.url, loaded)
                             notifyDataSetChanged()
                         }
                     }
                 }
-                return item.root
+                return cell.root
             }
         }
         view.grid.adapter = adapter
         view.grid.setOnItemClickListener { _, _, position, _ ->
-            val url = images[position].url
+            val url = items[position].url
             if (!selected.remove(url)) selected.add(url)
             adapter.notifyDataSetChanged()
             refresh()
         }
         view.selectAll.setOnClickListener {
-            if (selected.size == images.size) selected.clear() else selected.addAll(images.map { it.url })
+            if (selected.size == items.size) selected.clear() else selected.addAll(items.map { it.url })
             adapter.notifyDataSetChanged()
             refresh()
         }
+        if (crawlFrom != null) {
+            view.morePages.visibility = View.VISIBLE
+            view.morePages.setOnClickListener {
+                view.morePages.isEnabled = false
+                crawlJob = lifecycleScope.launch {
+                    LinkGrabber(this@MainActivity, userAgent).crawl(crawlFrom) { page, found ->
+                        withContext(Dispatchers.Main) {
+                            val known = items.mapTo(HashSet()) { it.url }
+                            items.addAll(found.filter { it.url !in known && StorePolicy.allowsDownload(it.url, crawlFrom) })
+                            view.morePages.text = getString(R.string.grab_searching_page, page)
+                            adapter.notifyDataSetChanged()
+                            refresh()
+                        }
+                    }
+                    view.morePages.text = getString(R.string.grab_done)
+                }
+            }
+        }
         view.download.setOnClickListener {
-            downloadImages(selected.toList(), pageTitle)
+            downloadItems(items.filter { it.url in selected }, pageTitle)
             sheet.dismiss()
         }
         refresh()
-        sheet.setOnDismissListener { loading.values.forEach { it.cancel() } }
+        sheet.setOnDismissListener {
+            crawlJob?.cancel()
+            loading.values.forEach { it.cancel() }
+        }
         sheet.show()
     }
 
-    private fun downloadImages(urls: List<String>, pageTitle: String) {
+    private fun downloadItems(chosen: List<GrabItem>, pageTitle: String) {
         val tab = tabManager.current
-        val allowed = urls.filter { StorePolicy.allowsDownload(it, tab?.url) }
+        val allowed = chosen.filter { StorePolicy.allowsDownload(it.url, it.referer ?: tab?.url) && StorePolicy.allowsKind(it.kind) }
         if (allowed.isEmpty()) return
         withDownloadNotice {
             val used = mutableSetOf<String>()
-            allowed.forEachIndexed { i, url ->
+            allowed.forEachIndexed { i, item ->
                 // Nombre del archivo en la web si lo tiene; si no, el título de la página numerado.
-                val fromUrl = URLUtil.guessFileName(url, null, null)
-                    .takeIf { MediaSniffer.kindForExtension(MediaSniffer.extensionOf(url)) == MediaKind.IMAGE }
+                val fromUrl = URLUtil.guessFileName(item.url, null, null)
+                    .takeIf { MediaSniffer.kindForExtension(MediaSniffer.extensionOf(item.url)) == item.kind }
                 val name = fromUrl?.takeIf { used.add(it) }
                 DownloadCenter.enqueue(
                     DownloadRequest(
-                        url = UrlUtils.upgradeToHttps(url),
+                        url = UrlUtils.upgradeToHttps(item.url),
                         title = if (name == null && allowed.size > 1) "$pageTitle ${i + 1}" else pageTitle,
-                        kind = MediaKind.IMAGE,
-                        referer = tab?.url,
+                        kind = item.kind,
+                        referer = item.referer ?: tab?.url,
                         userAgent = tab?.webView?.settings?.userAgentString ?: "",
                         fileName = name,
                     )
@@ -664,6 +710,57 @@ class MainActivity : SecureActivity(),
             }
             askNotificationPermission()
             Toast.makeText(this, getString(R.string.images_started, allowed.size), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** Recolector de enlaces: se pegan direcciones y se saca todo lo descargable de cada una. */
+    private fun showLinkCollector() {
+        val clip = runCatching {
+            (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()
+        }.getOrNull().orEmpty()
+        val input = EditText(this).apply {
+            hint = getString(R.string.grab_hint)
+            minLines = 3
+            maxLines = 8
+            setText(LinkGrabber.urlsIn(clip).joinToString("\n"))
+        }
+        val box = FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.grab_title)
+            .setMessage(R.string.grab_message)
+            .setView(box)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.grab_search) { _, _ -> collectLinks(LinkGrabber.urlsIn(input.text.toString())) }
+            .showSecure()
+    }
+
+    private fun collectLinks(urls: List<String>) {
+        if (urls.isEmpty()) {
+            Toast.makeText(this, R.string.grab_no_links, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val userAgent = tabManager.current?.webView?.settings?.userAgentString ?: WebSettings.getDefaultUserAgent(this)
+        val grabber = LinkGrabber(this, userAgent)
+        Toast.makeText(this, R.string.grab_working, Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            val found = mutableListOf<GrabItem>()
+            urls.map { UrlUtils.upgradeToHttps(it) }.forEach { url ->
+                val direct = grabber.directItem(url)
+                if (direct != null) found.add(direct)
+                else grabber.crawl(url, maxPages = 1) { _, items -> found.addAll(items) }
+            }
+            val allowed = found.distinctBy { it.url }.filter { StorePolicy.allowsDownload(it.url, it.referer) }
+            if (allowed.isEmpty()) {
+                Toast.makeText(this@MainActivity, R.string.grab_nothing, Toast.LENGTH_LONG).show()
+            } else {
+                // Si es una sola página, se puede seguir por sus páginas siguientes (galerías).
+                val single = urls.singleOrNull()?.takeIf { grabber.directItem(it) == null }?.let { UrlUtils.upgradeToHttps(it) }
+                showImagePicker(allowed, getString(R.string.app_name), single)
+            }
         }
     }
 

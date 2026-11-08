@@ -48,6 +48,17 @@
     <string name="images_download">Descargar %d</string>
     <string name="images_download_none">Elige imágenes</string>
     <string name="images_started">Descargando %d imágenes a la carpeta segura…</string>
+    <string name="menu_grab_links">Recolector de enlaces</string>
+    <string name="grab_title">Recolector de enlaces</string>
+    <string name="grab_message">Pega uno o varios enlaces. Nauvel busca todas las imágenes, vídeos y audios que hay detrás.</string>
+    <string name="grab_hint">https://…</string>
+    <string name="grab_search">Buscar</string>
+    <string name="grab_no_links">El texto no tiene ningún enlace.</string>
+    <string name="grab_working">Buscando en los enlaces…</string>
+    <string name="grab_nothing">No he encontrado nada para descargar en esos enlaces.</string>
+    <string name="grab_more_pages">Buscar en las páginas siguientes de la galería</string>
+    <string name="grab_searching_page">Buscando… página %d</string>
+    <string name="grab_done">Revisadas todas las páginas</string>
     <string name="download_image">Descargar imagen</string>
     <string name="download_link">Descargar enlace</string>
     <string name="open_new_tab">Abrir en pestaña nueva</string>
