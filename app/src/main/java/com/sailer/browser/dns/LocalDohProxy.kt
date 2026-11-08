@@ -34,7 +34,8 @@ object LocalDohProxy {
         thread(name = "doh-proxy-accept", isDaemon = true) {
             while (!socket.isClosed) {
                 val client = runCatching { socket.accept() }.getOrNull() ?: continue
-                pool.execute { runCatching { handle(client) }; runCatching { client.close() } }
+                runCatching { pool.execute { runCatching { handle(client) }; runCatching { client.close() } } }
+                    .onFailure { runCatching { client.close() } }
             }
         }
         return socket.localPort
@@ -85,11 +86,15 @@ object LocalDohProxy {
             out.write("HTTP/1.1 200 Connection Established\r\n\r\n".toByteArray())
             out.flush()
             client.soTimeout = 0
+            // Los flujos se piden aquí, antes de lanzar la otra mitad: si esa tarea
+            // arrancaba con el túnel ya cerrado, el error cerraba toda la app.
+            val fromRemote = remote.getInputStream()
+            val toRemote = remote.getOutputStream()
             pool.execute {
-                pipe(remote.getInputStream(), out)
+                runCatching { pipe(fromRemote, out) }
                 runCatching { client.shutdownOutput() }
             }
-            pipe(input, remote.getOutputStream())
+            pipe(input, toRemote)
             runCatching { remote.shutdownOutput() }
         }
     }
