@@ -167,10 +167,10 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             val single = selectedFiles.size + selectedFolders.size == 1
             toolbar.menu.findItem(R.id.action_rename).isVisible = single
         } else {
-            val cut = cutFiles.size + cutFolders.size
-            toolbar.menu.findItem(R.id.action_paste).apply { isVisible = cut > 0; title = getString(R.string.vault_paste, cut) }
-            toolbar.menu.findItem(R.id.action_cancel_paste).isVisible = cut > 0
             toolbar.inflateMenu(R.menu.vault_menu)
+            val cut = cutFiles.size + cutFolders.size
+            toolbar.menu.findItem(R.id.action_paste)?.apply { isVisible = cut > 0; title = getString(R.string.vault_paste, cut) }
+            toolbar.menu.findItem(R.id.action_cancel_paste)?.isVisible = cut > 0
             toolbar.title = if (folder.isEmpty()) getString(R.string.menu_vault) else Vault.nameOf(folder)
             toolbar.subtitle = if (folder.isEmpty()) getString(R.string.vault_subtitle) else "/" + folder
             toolbar.setNavigationIcon(R.drawable.ic_back)
