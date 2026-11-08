@@ -55,7 +55,8 @@ object MediaSniffer {
     /**
      * JavaScript que describe la página: título, imagen de portada, cada
      * vídeo/audio con su resolución, duración y miniatura, y las imágenes
-     * (sin iconos pequeños; de cada una, la versión más grande que ofrece).
+     * (sin iconos pequeños; de cada una, la versión más grande que ofrece, y si
+     * una miniatura enlaza a la foto a tamaño completo, esa foto).
      */
     const val SCAN_SCRIPT = """
         (function() {
@@ -92,8 +93,14 @@ object MediaSniffer {
             if (!best) return '';
             try { return new URL(best, document.baseURI).href; } catch (e) { return ''; }
           }
+          function isImageLink(u) {
+            return /\.(jpe?g|png|gif|webp|bmp|avif|heic)(\?|#|$)/i.test(u || '');
+          }
           addImage(meta('og:image'), 0, 0);
           document.querySelectorAll('img').forEach(function(e) {
+            // Como JDownloader: si la miniatura enlaza a la foto grande, se usa la grande.
+            var link = e.closest('a');
+            if (link && isImageLink(link.href)) { addImage(link.href, 0, 0); return; }
             var w = e.naturalWidth || e.width, h = e.naturalHeight || e.height;
             if (w && h && (w < 120 || h < 120)) return;
             var lazy = e.getAttribute('data-src') || e.getAttribute('data-original') || e.getAttribute('data-lazy-src');
@@ -103,6 +110,7 @@ object MediaSniffer {
             }
             addImage(src, w, h);
           });
+          document.querySelectorAll('a[href]').forEach(function(a) { if (isImageLink(a.href)) addImage(a.href, 0, 0); });
           return JSON.stringify({ title: document.title, image: meta('og:image'), items: items, images: images });
         })();
     """
