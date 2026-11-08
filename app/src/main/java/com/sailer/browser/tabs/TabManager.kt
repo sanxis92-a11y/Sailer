@@ -58,6 +58,32 @@ class TabManager(
         listener.onTabsChanged(tabs)
     }
 
+    /**
+     * Cambia el WebView de una pestaña cuyo motor se ha cerrado por uno nuevo
+     * y vuelve a abrir la misma dirección (o el inicio, si [reload] es false).
+     */
+    fun replaceCrashed(webView: WebView, reload: Boolean): Tab? {
+        val index = _tabs.indexOfFirst { it.webView === webView }
+        if (index < 0) return null
+        val old = _tabs[index]
+        val tab = Tab(old.id, createWebView()).apply { title = old.title; url = old.url }
+        _tabs[index] = tab
+        if (!reload || tab.url.isBlank() || tab.url == HOME_URL) {
+            tab.url = ""
+            tab.webView.loadDataWithBaseURL(HOME_URL, homeHtml, "text/html", "utf-8", null)
+        } else {
+            tab.webView.loadUrl(tab.url)
+        }
+        if (current === old) {
+            current = tab
+            listener.onCurrentTabChanged(tab)
+        } else {
+            tab.webView.onPause()
+        }
+        destroy(old.webView)
+        return tab
+    }
+
     /** Cierra todas las pestañas y devuelve sus WebView aún sin destruir. */
     fun detachAll(): List<WebView> {
         val webViews = _tabs.map { it.webView }

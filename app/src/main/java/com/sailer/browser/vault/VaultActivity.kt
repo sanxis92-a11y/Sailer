@@ -62,6 +62,13 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
 
     private var pendingExport: List<Row> = emptyList()
 
+    /** Tipo que se muestra: 0 todo, 1 imágenes, 2 vídeos, 3 audio, 4 otros. */
+    private var filter = 0
+
+    /** Miniaturas que se están calculando (ids de archivo). */
+    private val loadingThumbs = mutableSetOf<String>()
+    private val thumbPool = java.util.concurrent.Executors.newFixedThreadPool(2)
+
     private val exportOneLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri -> uri?.let { target -> (pendingExport.singleOrNull() as? Row.File)?.let { exportOne(it.entry, target) } } }
@@ -85,6 +92,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
         vault = Vault.get(this)
         prefs = Prefs.get(this)
         folder = savedInstanceState?.getString(STATE_FOLDER).orEmpty()
+        filter = savedInstanceState?.getInt(STATE_FILTER) ?: 0
 
         binding.toolbar.setNavigationOnClickListener { goBack() }
         onBackPressedDispatcher.addCallback(this, backCallback)
@@ -106,6 +114,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_FOLDER, folder)
+        outState.putInt(STATE_FILTER, filter)
     }
 
     override fun onStart() {
@@ -119,6 +128,11 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
         vault.removeListener(this)
         DownloadCenter.removeListener(this)
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        thumbPool.shutdownNow()
+        super.onDestroy()
     }
 
     override fun onVaultChanged() = refresh()
@@ -153,6 +167,9 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             val single = selectedFiles.size + selectedFolders.size == 1
             toolbar.menu.findItem(R.id.action_rename).isVisible = single
         } else {
+            val cut = cutFiles.size + cutFolders.size
+            toolbar.menu.findItem(R.id.action_paste).apply { isVisible = cut > 0; title = getString(R.string.vault_paste, cut) }
+            toolbar.menu.findItem(R.id.action_cancel_paste).isVisible = cut > 0
             toolbar.inflateMenu(R.menu.vault_menu)
             toolbar.title = if (folder.isEmpty()) getString(R.string.menu_vault) else Vault.nameOf(folder)
             toolbar.subtitle = if (folder.isEmpty()) getString(R.string.vault_subtitle) else "/" + folder
@@ -170,6 +187,11 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 R.id.action_select_all -> selectAll()
                 R.id.action_rename -> selectedRows().singleOrNull()?.let { rename(it) }
                 R.id.action_export -> confirmExport(selectedRows())
+                R.id.action_cut -> cut(selectedRows())
+                R.id.action_paste -> paste()
+                R.id.action_cancel_paste -> { cutFiles.clear(); cutFolders.clear(); updateToolbar() }
+                R.id.action_details -> showDetails(selectedRows())
+                R.id.action_filter -> chooseFilter()
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -296,7 +318,9 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
         val options = arrayOf(
             getString(R.string.vault_rename),
             getString(R.string.vault_move),
+            getString(R.string.vault_cut),
             getString(R.string.vault_export),
+            getString(R.string.vault_details),
             getString(R.string.vault_delete),
         )
         MaterialAlertDialogBuilder(this)
@@ -305,8 +329,10 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 when (which) {
                     0 -> rename(row)
                     1 -> chooseMoveTarget(listOf(row))
-                    2 -> confirmExport(listOf(row))
-                    3 -> confirmDelete(listOf(row))
+                    2 -> cut(listOf(row))
+                    3 -> confirmExport(listOf(row))
+                    4 -> showDetails(listOf(row))
+                    5 -> confirmDelete(listOf(row))
                 }
             }
             .showSecure()
@@ -398,6 +424,99 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
         clearSelection()
     }
 
+    // ---- Cortar y pegar ----
+
+    private fun cut(rows: List<Row>) {
+        if (rows.isEmpty()) return
+        cutFiles.clear()
+        cutFolders.clear()
+        rows.forEach { row ->
+            when (row) {
+                is Row.File -> cutFiles.add(row.entry.id)
+                is Row.Folder -> cutFolders.add(row.path)
+                is Row.Task -> Unit
+            }
+        }
+        toast(getString(R.string.vault_cut_done, cutFiles.size + cutFolders.size))
+        clearSelection()
+    }
+
+    private fun paste() {
+        val files = vault.list().filter { it.id in cutFiles }
+        val folders = cutFolders.filter { it in vault.allFolders() }
+        cutFiles.clear()
+        cutFolders.clear()
+        // Si se pega una carpeta dentro de sí misma, Vault.move la deja donde estaba.
+        vault.move(files, folders, folder)
+        refresh()
+    }
+
+    // ---- Detalles y filtro ----
+
+    private fun kindName(kind: MediaKind) = getString(
+        when (kind) {
+            MediaKind.IMAGE -> R.string.kind_image
+            MediaKind.VIDEO, MediaKind.HLS, MediaKind.DASH -> R.string.kind_video
+            MediaKind.AUDIO -> R.string.kind_audio
+            MediaKind.FILE -> R.string.kind_file
+        }
+    )
+
+    private fun showDetails(rows: List<Row>) {
+        if (rows.isEmpty()) return
+        val size = { bytes: Long -> Formatter.formatFileSize(this, bytes) }
+        val (title, body) = when (val row = rows.singleOrNull()) {
+            is Row.File -> row.entry.name to getString(
+                R.string.vault_details_body,
+                kindName(row.entry.kind) + (row.entry.mime?.let { " ($it)" } ?: ""),
+                size(row.entry.size),
+                DateFormat.getMediumDateFormat(this).format(row.entry.created) + " " +
+                    DateFormat.getTimeFormat(this).format(row.entry.created),
+                "/" + row.entry.folder,
+            )
+            is Row.Folder -> Vault.nameOf(row.path) to getString(
+                R.string.vault_details_folder, vault.countIn(row.path), size(vault.sizeIn(row.path)), "/" + Vault.parentOf(row.path),
+            )
+            else -> {
+                val files = rows.filterIsInstance<Row.File>().map { it.entry } +
+                    rows.filterIsInstance<Row.Folder>().flatMap { f -> vault.list().filter { Vault.isInside(it.folder, f.path) } }
+                val unique = files.distinctBy { it.id }
+                getString(R.string.vault_details) to getString(R.string.vault_details_many, unique.size, size(unique.sumOf { it.size }))
+            }
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(body)
+            .setPositiveButton(R.string.close, null)
+            .showSecure()
+    }
+
+    private fun chooseFilter() {
+        val options = arrayOf(
+            getString(R.string.filter_all),
+            getString(R.string.filter_images),
+            getString(R.string.filter_videos),
+            getString(R.string.filter_audio),
+            getString(R.string.filter_other),
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.vault_filter)
+            .setSingleChoiceItems(options, filter) { dialog, which ->
+                filter = which
+                adapter.refresh()
+                dialog.dismiss()
+            }
+            .showSecure()
+    }
+
+    private fun matchesFilter(entry: Vault.Entry) = when (filter) {
+        1 -> entry.kind == MediaKind.IMAGE
+        2 -> entry.kind == MediaKind.VIDEO || entry.kind == MediaKind.HLS || entry.kind == MediaKind.DASH
+        3 -> entry.kind == MediaKind.AUDIO
+        4 -> entry.kind == MediaKind.FILE
+        else -> true
+    }
+
     private fun confirmDelete(rows: List<Row>) {
         if (rows.isEmpty()) return
         val message = (rows.singleOrNull() as? Row.File)?.let { getString(R.string.vault_delete_confirm, it.entry.name) }
@@ -440,6 +559,8 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                     vault.openInput(entry).use { it.copyTo(out, 128 * 1024) }
                 }
             }.isSuccess
+            // Mover, no copiar: una vez fuera, se borra de la carpeta segura.
+            if (ok) vault.delete(entry)
             runOnUiThread {
                 toast(getString(if (ok) R.string.vault_exported else R.string.vault_export_failed))
                 if (ok) clearSelection()
@@ -447,17 +568,22 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
         }
     }
 
-    /** Exporta archivos y carpetas (con sus subcarpetas) a la carpeta del móvil elegida. */
+    /**
+     * Mueve archivos y carpetas (con sus subcarpetas) a la carpeta del móvil
+     * elegida: lo que se ha guardado bien fuera se borra de la carpeta segura.
+     */
     private fun exportToTree(rows: List<Row>, tree: Uri) {
         toast(getString(R.string.vault_preparing))
         thread {
             var done = 0
+            val moved = mutableListOf<Vault.Entry>()
             val result = runCatching {
                 val root = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
                 fun writeFile(parent: Uri, entry: Vault.Entry) {
                     val doc = DocumentsContract.createDocument(contentResolver, parent, entry.mime ?: "application/octet-stream", entry.name)
                         ?: return
                     contentResolver.openOutputStream(doc)!!.use { out -> vault.openInput(entry).use { it.copyTo(out, 128 * 1024) } }
+                    moved.add(entry)
                     done++
                 }
                 fun writeFolder(parent: Uri, path: String) {
@@ -473,6 +599,10 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                         is Row.Task -> Unit
                     }
                 }
+            }
+            runCatching {
+                vault.delete(moved)
+                if (result.isSuccess) rows.filterIsInstance<Row.Folder>().forEach { vault.deleteFolder(it.path) }
             }
             runOnUiThread {
                 toast(if (result.isSuccess) getString(R.string.vault_exported_many, done) else getString(R.string.vault_export_failed))
@@ -578,11 +708,11 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 val q = query.lowercase()
                 vault.allFolders().filter { Vault.nameOf(it).lowercase().contains(q) }.sorted()
                     .map { Row.Folder(it, vault.countIn(it)) } +
-                    sorted(vault.list().filter { it.name.lowercase().contains(q) }).map { Row.File(it) }
+                    sorted(vault.list().filter { it.name.lowercase().contains(q) && matchesFilter(it) }).map { Row.File(it) }
             } else {
                 val tasks = if (folder.isEmpty()) DownloadCenter.tasks.map { Row.Task(it) } else emptyList()
                 val folders = vault.foldersIn(folder).sortedBy { it.lowercase() }.map { Row.Folder(it, vault.countIn(it)) }
-                tasks + folders + sorted(vault.filesIn(folder)).map { Row.File(it) }
+                tasks + folders + sorted(vault.filesIn(folder).filter { matchesFilter(it) }).map { Row.File(it) }
             }
             notifyDataSetChanged()
         }
@@ -606,6 +736,8 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             view.root.setBackgroundColor(
                 if (selected) ContextCompat.getColor(this@VaultActivity, R.color.accent_container) else Color.TRANSPARENT
             )
+            view.thumb.visibility = View.GONE
+            view.root.alpha = if (isCut(row)) 0.5f else 1f
             when (row) {
                 is Row.Task -> {
                     val item = row.task
@@ -629,7 +761,8 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 is Row.Folder -> {
                     view.icon.text = if (selected) "✅" else "📁"
                     view.title.text = Vault.nameOf(row.path)
-                    val count = getString(R.string.vault_folder_items, row.count)
+                    val count = getString(R.string.vault_folder_items, row.count) + " · " +
+                        Formatter.formatShortFileSize(this@VaultActivity, vault.sizeIn(row.path))
                     view.subtitle.text = if (query.isNotEmpty() && Vault.parentOf(row.path).isNotEmpty()) {
                         "$count · /${Vault.parentOf(row.path)}"
                     } else {
@@ -644,6 +777,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                         MediaKind.IMAGE -> "🖼️"
                         MediaKind.FILE -> "📄"
                     }
+                    if (!selected) showThumbnail(view, item)
                     view.title.text = item.name
                     val date = DateFormat.getMediumDateFormat(this@VaultActivity).format(item.created)
                     val details = "${Formatter.formatShortFileSize(this@VaultActivity, item.size)} · $date"
@@ -654,7 +788,40 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
         }
     }
 
+    private fun isCut(row: Row) = when (row) {
+        is Row.File -> row.entry.id in cutFiles
+        is Row.Folder -> row.path in cutFolders
+        is Row.Task -> false
+    }
+
+    /** Miniatura de foto o vídeo: se descifra en segundo plano y se guarda solo en memoria. */
+    private fun showThumbnail(view: ItemVaultBinding, entry: Vault.Entry) {
+        if (!Thumbnails.supports(entry)) return
+        val cached = Thumbnails.cached(entry)
+        if (cached != null) {
+            view.thumb.setImageBitmap(cached)
+            view.thumb.visibility = View.VISIBLE
+            return
+        }
+        if (Thumbnails.hasFailed(entry) || !loadingThumbs.add(entry.id)) return
+        val size = (48 * resources.displayMetrics.density).toInt()
+        runCatching {
+            thumbPool.execute {
+                val bitmap = Thumbnails.load(vault, entry, size)
+                runOnUiThread {
+                    loadingThumbs.remove(entry.id)
+                    if (bitmap != null && !isDestroyed) adapter.notifyDataSetChanged()
+                }
+            }
+        }.onFailure { loadingThumbs.remove(entry.id) }
+    }
+
     companion object {
         private const val STATE_FOLDER = "folder"
+        private const val STATE_FILTER = "filter"
+
+        /** Lo cortado sigue guardado aunque se cambie de carpeta o se salga y vuelva a entrar. */
+        private val cutFiles = linkedSetOf<String>()
+        private val cutFolders = linkedSetOf<String>()
     }
 }

@@ -38,6 +38,8 @@ data class DownloadRequest(
     val audioUrl: String? = null,
     /** Calidad de vídeo elegida en un manifiesto DASH. */
     val videoId: String? = null,
+    /** Carpeta de la carpeta segura donde se guarda (p. ej. el nombre de la web). */
+    val folder: String = "",
 )
 
 /**
@@ -131,7 +133,7 @@ class Downloader(private val context: Context) {
             ?: mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
             ?: urlExt
             ?: "bin"
-        return vault.adopt(part, fileName(request, ext), kind, mime)
+        return vault.adopt(part, fileName(request, ext), kind, mime, request.folder)
     }
 
     // ---- HLS y DASH (por trozos, se reanuda por el último trozo) ----
@@ -151,7 +153,7 @@ class Downloader(private val context: Context) {
         val audio = plan.audio
         if (audio == null) {
             val ext = plan.video.extension
-            return vault.adopt(videoPart, fileName(request, ext), if (audioOnly) MediaKind.AUDIO else MediaKind.VIDEO, mimeFor(ext))
+            return vault.adopt(videoPart, fileName(request, ext), if (audioOnly) MediaKind.AUDIO else MediaKind.VIDEO, mimeFor(ext), request.folder)
         }
 
         // Vídeo y audio separados: unirlos en un solo archivo.
@@ -163,7 +165,7 @@ class Downloader(private val context: Context) {
             val writer = vault.newWriter()
             try {
                 muxed.inputStream().use { it.copyTo(writer.output, 256 * 1024) }
-                writer.commit(fileName(request, ext), MediaKind.VIDEO, mimeFor(ext))
+                writer.commit(fileName(request, ext), MediaKind.VIDEO, mimeFor(ext), folder = request.folder)
             } catch (e: Throwable) {
                 writer.abort()
                 throw e
@@ -171,8 +173,8 @@ class Downloader(private val context: Context) {
         } catch (e: Exception) {
             // Si no se pueden unir (formato raro), se guardan las dos pistas por separado.
             muxed.delete()
-            vault.adopt(audioPart, fileName(request, audio.extension, " (audio)"), MediaKind.AUDIO, mimeFor(audio.extension))
-            vault.adopt(videoPart, fileName(request, plan.video.extension, Lang.t(" (vídeo)", " (video)")), MediaKind.VIDEO, mimeFor(plan.video.extension))
+            vault.adopt(audioPart, fileName(request, audio.extension, " (audio)"), MediaKind.AUDIO, mimeFor(audio.extension), request.folder)
+            vault.adopt(videoPart, fileName(request, plan.video.extension, Lang.t(" (vídeo)", " (video)")), MediaKind.VIDEO, mimeFor(plan.video.extension), request.folder)
         } finally {
             muxed.delete()
         }
@@ -257,7 +259,7 @@ class Downloader(private val context: Context) {
         try {
             writer.output.write(bytes)
             val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "bin"
-            return writer.commit(fileName(request, ext), MediaSniffer.kindForMime(mime) ?: MediaKind.FILE, mime)
+            return writer.commit(fileName(request, ext), MediaSniffer.kindForMime(mime) ?: MediaKind.FILE, mime, folder = request.folder)
         } catch (e: Throwable) {
             writer.abort()
             throw e

@@ -8,6 +8,7 @@ import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.util.LruCache
 import android.widget.BaseAdapter
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.format.Formatter
@@ -37,6 +38,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.sailer.browser.lock.showSecure
 import com.sailer.browser.adblock.CosmeticFilter
+import com.sailer.browser.diag.CrashLog
 import com.sailer.browser.databinding.ItemImageBinding
 import com.sailer.browser.databinding.ItemMediaBinding
 import com.sailer.browser.databinding.SheetImagesBinding
@@ -69,6 +71,7 @@ import com.sailer.browser.web.SailerWebViewClient
 import com.sailer.browser.web.UrlUtils
 import com.sailer.browser.vault.Bookmarks
 import com.sailer.browser.vault.BookmarksActivity
+import com.sailer.browser.vault.Vault
 import com.sailer.browser.vault.VaultActivity
 import org.json.JSONArray
 import org.json.JSONObject
@@ -131,6 +134,21 @@ class MainActivity : SecureActivity(),
         val startUrl = intentUrl(intent)
         tabManager.newTab(startUrl)
         if (startUrl == null) focusAddressBar()
+        if (savedInstanceState == null) CrashLog.takeLast(this)?.let { showCrashReport(it) }
+    }
+
+    /** La app se cerró por un error la última vez: se ofrece copiar el informe para enviarlo. */
+    private fun showCrashReport(report: String) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.crash_title)
+            .setMessage(R.string.crash_message)
+            .setNegativeButton(R.string.close, null)
+            .setPositiveButton(R.string.crash_copy) { _, _ ->
+                (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
+                    .setPrimaryClip(android.content.ClipData.newPlainText("Nauvel", report))
+                Toast.makeText(this, R.string.crash_copied, Toast.LENGTH_SHORT).show()
+            }
+            .showSecure()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -349,6 +367,25 @@ class MainActivity : SecureActivity(),
         val url = request.url.toString()
         val kind = MediaSniffer.classify(url) ?: return
         runOnUiThread { addMedia(view, DetectedMedia(url, kind)) }
+    }
+
+    private var lastCrashUrl: String? = null
+    private var lastCrashAt = 0L
+
+    override fun onRendererGone(view: WebView) {
+        runOnUiThread {
+            val tab = tabManager.findByWebView(view) ?: return@runOnUiThread
+            if (fullscreenView != null) onExitFullscreen()
+            // Si la misma web vuelve a fallar enseguida, no se recarga para no entrar en bucle.
+            val now = System.currentTimeMillis()
+            val reload = !(tab.url == lastCrashUrl && now - lastCrashAt < 20_000)
+            lastCrashUrl = tab.url
+            lastCrashAt = now
+            val wasCurrent = tab === tabManager.current
+            if (tabManager.replaceCrashed(view, reload) != null && wasCurrent) {
+                Toast.makeText(this, if (reload) R.string.page_crashed else R.string.page_crashed_again, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     // ---- SailerChromeClient.Callbacks ----
@@ -692,7 +729,11 @@ class MainActivity : SecureActivity(),
         if (allowed.isEmpty()) return
         withDownloadNotice {
             val used = mutableSetOf<String>()
+            // Varias a la vez: carpeta de la web y, dentro, una con el nombre de la página.
+            val pageFolder = Vault.cleanName(pageTitle.take(60))
             allowed.forEachIndexed { i, item ->
+                val site = siteFolder(item.referer ?: tab?.url)
+                val folder = if (allowed.size > 1 && site.isNotEmpty()) Vault.join(site, pageFolder) else site
                 // Nombre del archivo en la web si lo tiene; si no, el título de la página numerado.
                 val fromUrl = URLUtil.guessFileName(item.url, null, null)
                     .takeIf { MediaSniffer.kindForExtension(MediaSniffer.extensionOf(item.url)) == item.kind }
@@ -705,6 +746,7 @@ class MainActivity : SecureActivity(),
                         referer = item.referer ?: tab?.url,
                         userAgent = tab?.webView?.settings?.userAgentString ?: "",
                         fileName = name,
+                        folder = folder,
                     )
                 )
             }
@@ -762,6 +804,13 @@ class MainActivity : SecureActivity(),
                 showImagePicker(allowed, getString(R.string.app_name), single)
             }
         }
+    }
+
+    /** Carpeta con el nombre de la web (sin «www.») donde se guarda lo descargado de ella. */
+    private fun siteFolder(pageUrl: String?): String {
+        val host = pageUrl?.takeIf { it.startsWith("http") }?.let { runCatching { Uri.parse(it).host }.getOrNull() }
+            ?: return ""
+        return Vault.cleanName(host.removePrefix("www."))
     }
 
     /** La primera vez que se descarga algo se muestra el aviso de derechos de autor. */
@@ -869,6 +918,7 @@ class MainActivity : SecureActivity(),
                 fileName = fileName,
                 audioUrl = audioUrl,
                 videoId = videoId,
+                folder = siteFolder(tab?.url),
             )
         )
         askNotificationPermission()

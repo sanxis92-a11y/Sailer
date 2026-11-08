@@ -93,6 +93,8 @@ class Vault private constructor(context: Context) {
     /** Número de archivos dentro de [folder] y sus subcarpetas. */
     fun countIn(folder: String): Int = synchronized(this) { entries.count { isInside(it.folder, folder) } }
 
+    fun sizeIn(folder: String): Long = synchronized(this) { entries.filter { isInside(it.folder, folder) }.sumOf { it.size } }
+
     fun createFolder(parent: String, name: String): String = ensureFolder(join(parent, cleanName(name)))
 
     /** Crea la carpeta [path] (ruta completa) y las intermedias si faltan. */
@@ -172,6 +174,9 @@ class Vault private constructor(context: Context) {
 
     fun openInput(entry: Entry): InputStream = crypto.decrypt(fileOf(entry))
 
+    /** Lectura descifrada en cualquier posición (miniaturas de vídeo). */
+    fun openReader(entry: Entry): VaultCrypto.Reader = crypto.openReader(fileOf(entry))
+
     /** Empieza a escribir un archivo nuevo cifrado. */
     fun newWriter(): Writer = Writer(UUID.randomUUID().toString())
 
@@ -204,15 +209,16 @@ class Vault private constructor(context: Context) {
     }
 
     /** Mete en la carpeta segura un archivo ya cifrado con [crypto] (lo mueve). */
-    fun adopt(file: File, name: String, kind: MediaKind, mime: String?): Entry {
+    fun adopt(file: File, name: String, kind: MediaKind, mime: String?, folder: String = ""): Entry {
         val id = UUID.randomUUID().toString()
         val target = File(dir, "$id.bin")
         if (!file.renameTo(target)) {
             file.copyTo(target, overwrite = true)
             file.delete()
         }
-        val entry = Entry(id, name, kind, mime, crypto.plainLength(target), System.currentTimeMillis())
+        val entry = Entry(id, name, kind, mime, crypto.plainLength(target), System.currentTimeMillis(), folder)
         synchronized(this) {
+            if (folder.isNotEmpty()) addFolderLocked(folder)
             entries.add(entry)
             saveIndex()
         }
@@ -308,7 +314,7 @@ class Vault private constructor(context: Context) {
         /** ¿[path] es [folder] o está dentro de ella? */
         fun isInside(path: String, folder: String) = path == folder || path.startsWith("$folder/")
 
-        private fun cleanName(name: String) = name.replace('/', '-').trim().ifEmpty { "?" }
+        fun cleanName(name: String) = name.replace('/', '-').trim().ifEmpty { "?" }
 
         @Volatile
         private var instance: Vault? = null

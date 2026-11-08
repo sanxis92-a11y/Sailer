@@ -2,6 +2,11 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_paste"
+        android:title="@string/vault_paste"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/action_search"
         android:icon="@drawable/ic_search"
         android:title="@string/vault_search"
@@ -20,6 +25,15 @@
         android:title="@string/vault_new_folder"
         app:iconTint="@color/text"
         app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_filter"
+        android:title="@string/vault_filter"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_cancel_paste"
+        android:title="@string/vault_cancel_paste"
+        android:visible="false"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_import"
         android:title="@string/vault_import"

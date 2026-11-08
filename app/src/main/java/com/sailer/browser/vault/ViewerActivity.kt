@@ -68,10 +68,16 @@ class ViewerActivity : SecureActivity() {
         thread {
             val drawable: Drawable? = runCatching {
                 val bytes = vault.openInput(entry).use { it.readBytes() }
+                // Las fotos enormes se reducen: dibujarlas a tamaño real cierra la app.
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    ImageDecoder.decodeDrawable(ImageDecoder.createSource(ByteBuffer.wrap(bytes)))
+                    ImageDecoder.decodeDrawable(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
+                        decoder.setTargetSampleSize(sampleFor(info.size.width, info.size.height))
+                    }
                 } else {
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    val options = BitmapFactory.Options().apply { inSampleSize = sampleFor(bounds.outWidth, bounds.outHeight) }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
                         ?.let { android.graphics.drawable.BitmapDrawable(resources, it) }
                 }
             }.getOrNull()
@@ -90,6 +96,12 @@ class ViewerActivity : SecureActivity() {
         }
     }
 
+    private fun sampleFor(width: Int, height: Int): Int {
+        var sample = 1
+        while (maxOf(width, height) / sample > MAX_IMAGE_SIDE) sample *= 2
+        return sample
+    }
+
     override fun onPause() {
         player?.pause()
         super.onPause()
@@ -103,5 +115,6 @@ class ViewerActivity : SecureActivity() {
 
     companion object {
         const val EXTRA_ID = "id"
+        private const val MAX_IMAGE_SIDE = 4096
     }
 }
