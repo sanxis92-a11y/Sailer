@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.util.LruCache
+import android.widget.BaseAdapter
 import android.os.Build
 import android.os.Bundle
 import android.text.format.Formatter
@@ -31,12 +34,15 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.sailer.browser.lock.showSecure
 import com.sailer.browser.adblock.CosmeticFilter
+import com.sailer.browser.databinding.ItemImageBinding
 import com.sailer.browser.databinding.ItemMediaBinding
+import com.sailer.browser.databinding.SheetImagesBinding
 import com.sailer.browser.databinding.SheetMediaBinding
 import com.sailer.browser.media.MediaElementInfo
 import com.sailer.browser.media.MediaInspector
 import com.sailer.browser.media.StorePolicy
 import com.sailer.browser.media.MediaOption
+import com.sailer.browser.media.PageImage
 import com.sailer.browser.media.PageMediaInfo
 import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.databinding.ActivityMainBinding
@@ -62,7 +68,10 @@ import com.sailer.browser.vault.VaultActivity
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.Locale
 import kotlin.concurrent.thread
 
@@ -440,7 +449,12 @@ class MainActivity : SecureActivity(),
                 isAudio = o.optBoolean("audio"),
             )
         }
-        PageMediaInfo(json.optString("title"), json.optString("image"), elements)
+        val imageArray = json.optJSONArray("images") ?: JSONArray()
+        val images = (0 until imageArray.length()).map { i ->
+            val o = imageArray.getJSONObject(i)
+            PageImage(o.optString("src"), o.optInt("w"), o.optInt("h"))
+        }
+        PageMediaInfo(json.optString("title"), json.optString("image"), elements, images)
     }.getOrNull()
 
     private fun showMediaSheet(tab: Tab, info: PageMediaInfo) {
@@ -451,6 +465,14 @@ class MainActivity : SecureActivity(),
         val pageTitle = info.title.ifBlank { tab.title }.ifBlank { UrlUtils.forDisplay(tab.url) }
         view.pageTitle.text = pageTitle
         sheet.show()
+
+        val images = if (BuildConfig.IMAGE_GRABBER) info.images.filter { StorePolicy.allowsDownload(it.url, tab.url) } else emptyList()
+        if (images.isNotEmpty()) {
+            view.options.addView(imagesRow(view, images.size) {
+                sheet.dismiss()
+                showImagePicker(tab, images, pageTitle)
+            })
+        }
 
         if (!StorePolicy.allowsDownload(tab.url, tab.url)) {
             view.loading.visibility = View.GONE
@@ -533,6 +555,145 @@ class MainActivity : SecureActivity(),
         return row.root
     }
 
+    private fun imagesRow(sheet: SheetMediaBinding, count: Int, onOpen: () -> Unit): View {
+        val row = ItemMediaBinding.inflate(layoutInflater, sheet.options, false)
+        row.icon.text = "🖼️"
+        row.title.setText(R.string.images_row)
+        row.details.text = getString(R.string.images_count, count)
+        row.download.setText(R.string.images_view)
+        row.download.setOnClickListener { onOpen() }
+        row.root.setOnClickListener { onOpen() }
+        return row.root
+    }
+
+    /** Cuadrícula con las imágenes de la página: se marcan las que se quieren y se bajan todas juntas. */
+    private fun showImagePicker(tab: Tab, images: List<PageImage>, pageTitle: String) {
+        val sheet = BottomSheetDialog(this)
+        sheet.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val view = SheetImagesBinding.inflate(layoutInflater)
+        sheet.setContentView(view.root)
+        view.title.text = getString(R.string.images_count, images.size)
+
+        val selected = linkedSetOf<String>()
+        val userAgent = tab.webView.settings.userAgentString
+        val referer = tab.url
+        val inspector = MediaInspector(this)
+        val cache = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
+            override fun sizeOf(key: String, value: Bitmap) = value.byteCount
+        }
+        val loading = mutableMapOf<String, Job>()
+        val limit = Semaphore(4)
+
+        fun refresh() {
+            view.download.isEnabled = selected.isNotEmpty()
+            view.download.text = if (selected.isEmpty()) getString(R.string.images_download_none)
+            else getString(R.string.images_download, selected.size)
+            view.selectAll.setText(if (selected.size == images.size) R.string.images_select_none else R.string.images_select_all)
+        }
+
+        val adapter = object : BaseAdapter() {
+            override fun getCount() = images.size
+            override fun getItem(position: Int) = images[position]
+            override fun getItemId(position: Int) = position.toLong()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val item = convertView?.let { ItemImageBinding.bind(it) } ?: ItemImageBinding.inflate(layoutInflater, parent, false)
+                val image = images[position]
+                item.root.tag = image.url
+                item.size.text = if (image.width > 0 && image.height > 0) "${image.width}×${image.height}" else ""
+                item.size.visibility = if (item.size.text.isEmpty()) View.GONE else View.VISIBLE
+                val isSelected = image.url in selected
+                item.check.visibility = if (isSelected) View.VISIBLE else View.GONE
+                item.frame.setBackgroundColor(ContextCompat.getColor(this@MainActivity, if (isSelected) R.color.accent else R.color.field))
+                val bitmap = cache.get(image.url)
+                item.image.setImageBitmap(bitmap)
+                if (bitmap == null && image.url !in loading) {
+                    loading[image.url] = lifecycleScope.launch {
+                        val loaded = limit.withPermit { inspector.loadThumbnail(image.url, referer, userAgent) }
+                        loading.remove(image.url)
+                        if (loaded != null) {
+                            cache.put(image.url, loaded)
+                            notifyDataSetChanged()
+                        }
+                    }
+                }
+                return item.root
+            }
+        }
+        view.grid.adapter = adapter
+        view.grid.setOnItemClickListener { _, _, position, _ ->
+            val url = images[position].url
+            if (!selected.remove(url)) selected.add(url)
+            adapter.notifyDataSetChanged()
+            refresh()
+        }
+        view.selectAll.setOnClickListener {
+            if (selected.size == images.size) selected.clear() else selected.addAll(images.map { it.url })
+            adapter.notifyDataSetChanged()
+            refresh()
+        }
+        view.download.setOnClickListener {
+            downloadImages(selected.toList(), pageTitle)
+            sheet.dismiss()
+        }
+        refresh()
+        sheet.setOnDismissListener { loading.values.forEach { it.cancel() } }
+        sheet.show()
+    }
+
+    private fun downloadImages(urls: List<String>, pageTitle: String) {
+        val tab = tabManager.current
+        val allowed = urls.filter { StorePolicy.allowsDownload(it, tab?.url) }
+        if (allowed.isEmpty()) return
+        withDownloadNotice {
+            val used = mutableSetOf<String>()
+            allowed.forEachIndexed { i, url ->
+                // Nombre del archivo en la web si lo tiene; si no, el título de la página numerado.
+                val fromUrl = URLUtil.guessFileName(url, null, null)
+                    .takeIf { MediaSniffer.kindForExtension(MediaSniffer.extensionOf(url)) == MediaKind.IMAGE }
+                val name = fromUrl?.takeIf { used.add(it) }
+                DownloadCenter.enqueue(
+                    DownloadRequest(
+                        url = UrlUtils.upgradeToHttps(url),
+                        title = if (name == null && allowed.size > 1) "$pageTitle ${i + 1}" else pageTitle,
+                        kind = MediaKind.IMAGE,
+                        referer = tab?.url,
+                        userAgent = tab?.webView?.settings?.userAgentString ?: "",
+                        fileName = name,
+                    )
+                )
+            }
+            askNotificationPermission()
+            Toast.makeText(this, getString(R.string.images_started, allowed.size), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** La primera vez que se descarga algo se muestra el aviso de derechos de autor. */
+    private fun withDownloadNotice(action: () -> Unit) {
+        val prefs = Prefs.get(this)
+        if (prefs.downloadNoticeAccepted) {
+            action()
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.download_notice_title)
+            .setMessage(R.string.download_notice)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.download_notice_ok) { _, _ ->
+                prefs.downloadNoticeAccepted = true
+                action()
+            }
+            .showSecure()
+    }
+
+    private fun askNotificationPermission() {
+        // Para que la descarga siga con la app cerrada, Android 13+ pide permiso de notificaciones.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     private fun formatDuration(seconds: Double): String {
         val total = seconds.toLong()
         val h = total / 3600
@@ -585,19 +746,19 @@ class MainActivity : SecureActivity(),
             Toast.makeText(this, R.string.media_not_allowed, Toast.LENGTH_LONG).show()
             return
         }
-        val prefs = Prefs.get(this)
-        if (!prefs.downloadNoticeAccepted) {
-            MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.download_notice_title)
-                .setMessage(R.string.download_notice)
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(R.string.download_notice_ok) { _, _ ->
-                    prefs.downloadNoticeAccepted = true
-                    startDownload(url, kind, mimeType, fileName, titleSuffix, audioUrl, videoId)
-                }
-                .showSecure()
-            return
-        }
+        withDownloadNotice { enqueueDownload(url, kind, mimeType, fileName, titleSuffix, audioUrl, videoId) }
+    }
+
+    private fun enqueueDownload(
+        url: String,
+        kind: MediaKind,
+        mimeType: String?,
+        fileName: String?,
+        titleSuffix: String?,
+        audioUrl: String?,
+        videoId: String?,
+    ) {
+        val tab = tabManager.current
         val baseTitle = tab?.title?.ifBlank { null } ?: getString(R.string.app_name)
         val secureUrl = if (url.startsWith("data:")) url else UrlUtils.upgradeToHttps(url)
         DownloadCenter.enqueue(
@@ -613,12 +774,7 @@ class MainActivity : SecureActivity(),
                 videoId = videoId,
             )
         )
-        // Para que la descarga siga con la app cerrada, Android 13+ pide permiso de notificaciones.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        askNotificationPermission()
         Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show()
     }
 

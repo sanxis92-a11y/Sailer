@@ -39,6 +39,15 @@
     <string name="popup_blocked">Ventana emergente bloqueada</string>
     <string name="adblock_site_off">%d bloqueados · Desactivar en esta web</string>
     <string name="adblock_site_on">Activar bloqueador en esta web</string>
+    <string name="images_row">Imágenes de esta página</string>
+    <string name="images_count">%d imágenes</string>
+    <string name="images_view">Ver</string>
+    <string name="images_hint">Toca las que quieras guardar</string>
+    <string name="images_select_all">Todas</string>
+    <string name="images_select_none">Ninguna</string>
+    <string name="images_download">Descargar %d</string>
+    <string name="images_download_none">Elige imágenes</string>
+    <string name="images_started">Descargando %d imágenes a la carpeta segura…</string>
     <string name="download_image">Descargar imagen</string>
     <string name="download_link">Descargar enlace</string>
     <string name="open_new_tab">Abrir en pestaña nueva</string>

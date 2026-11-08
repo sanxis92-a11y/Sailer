@@ -40,6 +40,15 @@
     <string name="popup_blocked">Pop-up blocked</string>
     <string name="adblock_site_off">%d blocked · Turn off on this site</string>
     <string name="adblock_site_on">Turn on blocker for this site</string>
+    <string name="images_row">Images on this page</string>
+    <string name="images_count">%d images</string>
+    <string name="images_view">View</string>
+    <string name="images_hint">Tap the ones you want to save</string>
+    <string name="images_select_all">Select all</string>
+    <string name="images_select_none">Clear</string>
+    <string name="images_download">Download %d</string>
+    <string name="images_download_none">Choose images</string>
+    <string name="images_started">Downloading %d images to the secure folder…</string>
     <string name="download_image">Download image</string>
     <string name="download_link">Download link</string>
     <string name="open_new_tab">Open in new tab</string>
