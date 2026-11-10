@@ -277,30 +277,68 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
 
         /** Marcas típicas de miniatura en la dirección de una imagen. */
         private val SIZE_MARKS = listOf(
-            Regex("""-\d{2,4}x\d{2,4}(?=\.\w{3,4}(\?|$))"""),
+            Regex("""[-_]\d{2,5}x\d{2,5}(?=[-_.][^/?]*(\?|$))"""),
             Regex("""[_-](thumb|thumbnail|small|medium|preview|tn|th|sm|t)(?=\.\w{3,4}(\?|$))""", RegexOption.IGNORE_CASE),
             Regex("""/(thumbs?|thumbnails?|small|preview|tn|th)/""", RegexOption.IGNORE_CASE),
             Regex("""\?.*$"""),
         )
 
-        /** Clave de una imagen sin las marcas de tamaño (para juntar variantes de la misma foto). */
-        fun variantKey(url: String): String = SIZE_MARKS.fold(url) { acc, r -> r.replace(acc, "/") }.lowercase()
+        /** Misma foto en otro formato (Scrolller y otras sirven .jpg y .webp de cada una). */
+        private val IMAGE_EXT = Regex("""\.(jpe?g|png|webp|avif|gif)(?=\?|$)""", RegexOption.IGNORE_CASE)
+
+        /** Tamaño escrito en el nombre del archivo: foto-1080x1350.jpg, foto_800x600.webp… */
+        private val SIZE_IN_NAME = Regex("""[-_.](\d{2,5})x(\d{2,5})(?=[-_.][^/]*$|\.\w{3,4}(\?|$))""", RegexOption.IGNORE_CASE)
+
+        /** Clave de una imagen sin las marcas de tamaño ni el formato (para juntar variantes de la misma foto). */
+        fun variantKey(url: String): String {
+            val path = url.substringBefore('?')
+            // Sin extensión (p. ej. foto.php?id=5) lo que distingue cada foto va en la consulta.
+            if (!IMAGE_EXT.containsMatchIn(path)) return url.lowercase()
+            val plain = IMAGE_EXT.replace(path, ".img")
+            return SIZE_MARKS.foldIndexed(plain) { i, acc, r -> r.replace(acc, if (i <= 1) "" else "/") }.lowercase()
+        }
 
         private fun thumbScore(url: String): Int = SIZE_MARKS.dropLast(1).count { it.containsMatchIn(url) }
 
-        /** De varias versiones de la misma imagen, deja solo la que no parece miniatura. */
+        /** Ancho y alto según la página o, si no lo dice, según el nombre del archivo. */
+        fun sizeOf(item: GrabItem): Pair<Int, Int> {
+            if (item.width > 0 && item.height > 0) return item.width to item.height
+            val name = item.url.substringBefore('?').substringAfterLast('/')
+            val m = SIZE_IN_NAME.findAll(name).lastOrNull() ?: return 0 to 0
+            return (m.groupValues[1].toIntOrNull() ?: 0) to (m.groupValues[2].toIntOrNull() ?: 0)
+        }
+
+        /**
+         * ¿[a] es mejor versión que [b]? Primero la más grande en píxeles; si no se
+         * sabe, la que no tiene marcas de miniatura; a igualdad, JPG/PNG antes que WebP.
+         */
+        private fun better(a: GrabItem, b: GrabItem): Boolean {
+            val (aw, ah) = sizeOf(a)
+            val (bw, bh) = sizeOf(b)
+            val areaA = aw.toLong() * ah
+            val areaB = bw.toLong() * bh
+            if (areaA > 0 && areaB > 0 && areaA != areaB) return areaA > areaB
+            val ta = thumbScore(a.url)
+            val tb = thumbScore(b.url)
+            if (ta != tb) return ta < tb
+            if (areaA != areaB) return areaA > areaB
+            return isWebp(b.url) && !isWebp(a.url)
+        }
+
+        private fun isWebp(url: String) = url.substringBefore('?').endsWith(".webp", ignoreCase = true)
+
+        /** De varias versiones de la misma imagen, deja solo la más grande (y anota su tamaño). */
         fun dropSmallVariants(items: List<GrabItem>): List<GrabItem> {
             val best = linkedMapOf<String, GrabItem>()
             items.forEach { item ->
                 val key = if (item.kind == MediaKind.IMAGE) variantKey(item.url) else item.url
                 val current = best[key]
-                if (current == null || thumbScore(item.url) < thumbScore(current.url) ||
-                    item.width * item.height > current.width * current.height
-                ) {
-                    best[key] = item
-                }
+                if (current == null || better(item, current)) best[key] = item
             }
-            return best.values.toList()
+            return best.values.map { item ->
+                if (item.kind != MediaKind.IMAGE || (item.width > 0 && item.height > 0)) item
+                else sizeOf(item).let { (w, h) -> if (w > 0) item.copy(width = w, height = h) else item }
+            }
         }
 
         private val URL_IN_TEXT = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)

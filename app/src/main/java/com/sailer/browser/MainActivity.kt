@@ -50,6 +50,7 @@ import com.sailer.browser.media.MediaOption
 import com.sailer.browser.media.GrabItem
 import com.sailer.browser.media.PageImage
 import com.sailer.browser.media.LinkGrabber
+import com.sailer.browser.media.PageCollector
 import com.sailer.browser.media.PageMediaInfo
 import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.databinding.ActivityMainBinding
@@ -341,7 +342,10 @@ class MainActivity : SecureActivity(),
 
     override fun onPageStarted(view: WebView, url: String) {
         val tab = tabManager.findByWebView(view) ?: return
-        if (tab.url != url) tab.media.clear()
+        if (tab.url != url) {
+            tab.media.clear()
+            tab.seenImages.clear()
+        }
         tab.url = url
         if (tab === tabManager.current) updateMediaButton()
         if (tab === tabManager.current) showUrl(tab)
@@ -349,6 +353,7 @@ class MainActivity : SecureActivity(),
 
     override fun onPageFinished(view: WebView, url: String) {
         CosmeticFilter.applyLate(view)
+        PageCollector.applyLate(view)
         val tab = tabManager.findByWebView(view) ?: return
         tab.url = url
         if (tab === tabManager.current) showUrl(tab)
@@ -365,8 +370,33 @@ class MainActivity : SecureActivity(),
 
     override fun onResourceRequest(view: WebView, request: WebResourceRequest) {
         val url = request.url.toString()
+        if (BuildConfig.GRABBER && isImageRequest(request)) {
+            runOnUiThread {
+                val tab = tabManager.findByWebView(view) ?: return@runOnUiThread
+                if (tab.seenImages.size < MAX_SEEN_IMAGES) tab.seenImages.add(url)
+            }
+            return
+        }
         val kind = MediaSniffer.classify(url) ?: return
         runOnUiThread { addMedia(view, DetectedMedia(url, kind)) }
+    }
+
+    /** ¿Es la carga de una foto (por la extensión, o porque el navegador pide una imagen)? */
+    private fun isImageRequest(request: WebResourceRequest): Boolean {
+        if (request.isForMainFrame || !request.method.equals("GET", true)) return false
+        val url = request.url.toString()
+        if (!url.startsWith("https://")) return false
+        val kind = MediaSniffer.kindForExtension(MediaSniffer.extensionOf(url))
+        if (kind != null) return kind == MediaKind.IMAGE
+        val accept = request.requestHeaders.entries.firstOrNull { it.key.equals("Accept", true) }?.value.orEmpty()
+        return accept.startsWith("image/")
+    }
+
+    /** ¿Es [url] de la misma web que [pageUrl]? (images.ejemplo.com cuenta como ejemplo.com). */
+    private fun sameSite(url: String, pageUrl: String): Boolean {
+        fun site(u: String) = Uri.parse(u).host?.lowercase()?.split('.')?.takeLast(2)?.joinToString(".")
+        val a = site(url) ?: return false
+        return a == site(pageUrl)
     }
 
     private var lastCrashUrl: String? = null
@@ -498,7 +528,7 @@ class MainActivity : SecureActivity(),
         val imageArray = json.optJSONArray("images") ?: JSONArray()
         val images = (0 until imageArray.length()).map { i ->
             val o = imageArray.getJSONObject(i)
-            PageImage(o.optString("src"), o.optInt("w"), o.optInt("h"))
+            PageImage(o.optString("src"), o.optInt("w"), o.optInt("h"), o.optInt("v") == 1)
         }
         val detailArray = json.optJSONArray("details") ?: JSONArray()
         val details = (0 until detailArray.length()).map { detailArray.getString(it) }
@@ -516,7 +546,10 @@ class MainActivity : SecureActivity(),
 
         val images = if (BuildConfig.GRABBER) {
             info.images.filter { StorePolicy.allowsDownload(it.url, tab.url) }
-                .map { GrabItem(it.url, MediaKind.IMAGE, it.width, it.height, tab.url, pageTitle) }
+                .map { GrabItem(it.url, if (it.isVideo) MediaKind.VIDEO else MediaKind.IMAGE, it.width, it.height, tab.url, pageTitle) }
+                .plus(tab.seenImages.filter { sameSite(it, tab.url) }.map { GrabItem(it, MediaKind.IMAGE, referer = tab.url, album = pageTitle) })
+                .filter { StorePolicy.allowsDownload(it.url, tab.url) }
+                .distinctBy { it.url }
                 .let { LinkGrabber.dropSmallVariants(it) }
         } else {
             emptyList()
@@ -987,3 +1020,6 @@ class MainActivity : SecureActivity(),
         return intent.dataString?.let { UrlUtils.fromUserInput(it) }
     }
 }
+
+/** Tope de imágenes recordadas por pestaña (para no gastar memoria en webs infinitas). */
+private const val MAX_SEEN_IMAGES = 3000
