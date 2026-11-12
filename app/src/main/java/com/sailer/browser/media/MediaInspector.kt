@@ -91,22 +91,41 @@ class MediaInspector(private val context: Context) {
     }
 
     /** Descarga una miniatura pequeña para mostrarla en la lista. */
-    suspend fun loadThumbnail(url: String, referer: String?, userAgent: String): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun loadThumbnail(url: String, referer: String?, userAgent: String): Bitmap? =
+        loadPreview(url, referer, userAgent)?.bitmap
+
+    /** Miniatura de una imagen y su tamaño real en píxeles (null si no existe o no es una imagen). */
+    suspend fun loadPreview(url: String, referer: String?, userAgent: String): Preview? = withContext(Dispatchers.IO) {
         if (!url.startsWith("https://")) return@withContext null
         runCatching {
             val request = Request.Builder().url(url).header("User-Agent", userAgent).apply {
                 referer?.takeIf { it.startsWith("https://") }?.let { header("Referer", it) }
             }.build()
             client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
                 val bytes = response.body?.bytes() ?: return@use null
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                if (bounds.outWidth <= 0) return@use null
                 var sample = 1
                 while (bounds.outWidth / (sample * 2) >= 320) sample *= 2
                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+                    ?.let { Preview(it, bounds.outWidth, bounds.outHeight) }
             }
         }.getOrNull()
     }
+
+    /** ¿Existe esta dirección? (para comprobar los originales adivinados antes de bajarlos). */
+    suspend fun exists(url: String, referer: String?, userAgent: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder().url(url).head().header("User-Agent", userAgent).apply {
+                referer?.takeIf { it.startsWith("https://") }?.let { header("Referer", it) }
+            }.build()
+            client.newCall(request).execute().use { it.isSuccessful }
+        }.getOrDefault(false)
+    }
+
+    class Preview(val bitmap: Bitmap, val width: Int, val height: Int)
 
     private fun inspectOne(
         item: DetectedMedia,

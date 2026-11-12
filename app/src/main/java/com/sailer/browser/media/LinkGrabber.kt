@@ -25,7 +25,15 @@ data class GrabItem(
     val referer: String? = null,
     /** Título de esa página: nombre de la galería al guardar. */
     val album: String? = null,
+    /**
+     * Dirección de reserva cuando [url] es una versión grande «adivinada»
+     * (p. ej. el original de Pinterest): si esa no existe, se usa esta.
+     */
+    val fallback: String? = null,
 )
+
+/** Tipos para el filtro de la cuadrícula. */
+enum class GrabFilter { ALL, PHOTOS, GIFS, VIDEOS }
 
 /** Lo encontrado en una página: archivos, páginas de detalle de cada miniatura y la página siguiente. */
 class GrabPage(val items: List<GrabItem>, val details: List<String>, val next: String?, val title: String)
@@ -292,6 +300,8 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         /** Clave de una imagen sin las marcas de tamaño ni el formato (para juntar variantes de la misma foto). */
         fun variantKey(url: String): String {
             val path = url.substringBefore('?')
+            // Pinterest: la misma foto en cualquier tamaño (236x, 736x, originals…).
+            PIN_IMAGE.find(path)?.let { return "pinimg/" + IMAGE_EXT.replace(it.groupValues[2], ".img").lowercase() }
             // Sin extensión (p. ej. foto.php?id=5) lo que distingue cada foto va en la consulta.
             if (!IMAGE_EXT.containsMatchIn(path)) return url.lowercase()
             val plain = IMAGE_EXT.replace(path, ".img")
@@ -327,13 +337,113 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
 
         private fun isWebp(url: String) = url.substringBefore('?').endsWith(".webp", ignoreCase = true)
 
-        /** De varias versiones de la misma imagen, deja solo la más grande (y anota su tamaño). */
+        /** Marcas de calidad en la dirección de un vídeo: 720p, V_1080P, _hd, /480/… */
+        private val VIDEO_QUALITY = Regex("""(?<=[/_.-])(?:v_)?(144|240|360|480|540|576|720|1080|1440|2160|4320)p?(?=[/_.-])|(?<=[_-])(hd|sd|hq|lq|low|high|mobile)(?=[/_.-])""", RegexOption.IGNORE_CASE)
+
+        private fun videoKey(url: String): String =
+            VIDEO_QUALITY.replace(url.substringBefore('?'), "~").replace(Regex("""\.(mp4|webm|m4v|mov)$""", RegexOption.IGNORE_CASE), ".vid").lowercase()
+
+        /** Altura del vídeo según su dirección (720p → 720); 0 si no se sabe. */
+        fun videoQuality(url: String): Int {
+            var best = 0
+            VIDEO_QUALITY.findAll(url.substringBefore('?')).forEach { m ->
+                val n = m.groupValues[1].toIntOrNull()
+                val v = when {
+                    n != null -> n
+                    m.groupValues[2].lowercase() in setOf("hd", "hq", "high") -> 720
+                    m.groupValues[2].isNotEmpty() -> 360
+                    else -> 0
+                }
+                if (v > best) best = v
+            }
+            return best
+        }
+
+        // ---- Pinterest ----
+        // Sus fotos están en i.pinimg.com/<tamaño>/ab/cd/ef/archivo.jpg con tamaños
+        // 75x75_RS, 236x, 474x, 736x… y «originals» (la foto tal como se subió).
+        private val PIN_IMAGE = Regex("""^https://i\.pinimg\.com/([0-9]+x[0-9]*(?:_RS)?|originals)/(.+)$""", RegexOption.IGNORE_CASE)
+
+        /** Fotos de perfil de Pinterest (no son pines). */
+        fun isPinterestAvatar(url: String): Boolean =
+            PIN_IMAGE.find(url)?.groupValues?.get(1)?.endsWith("_RS", ignoreCase = true) == true
+
+        /** Tamaño de una foto de Pinterest según su carpeta (originals es el mayor); 0 si no es de Pinterest. */
+        private fun pinRank(url: String): Int {
+            val size = PIN_IMAGE.find(url)?.groupValues?.get(1) ?: return 0
+            return if (size.equals("originals", true)) 100_000 else size.substringBefore('x').toIntOrNull() ?: 1
+        }
+
+        /** Originales adivinados que no existían (para no volver a pedirlos). */
+        private val missing = java.util.Collections.synchronizedSet(HashSet<String>())
+
+        /** El original adivinado [url] no existe: a partir de ahora se usa la versión de reserva. */
+        fun markMissing(url: String) {
+            missing.add(url)
+        }
+
+        /** Convierte una miniatura de Pinterest en su original (con la de 736 px de reserva). */
+        private fun pinterestBest(item: GrabItem): GrabItem {
+            val m = PIN_IMAGE.find(item.url) ?: return item
+            if (m.groupValues[1].equals("originals", true)) return item
+            val rest = m.groupValues[2]
+            if ("https://i.pinimg.com/originals/$rest" in missing) return item
+            return item.copy(
+                url = "https://i.pinimg.com/originals/$rest",
+                width = 0, height = 0,
+                fallback = "https://i.pinimg.com/736x/$rest",
+            )
+        }
+
+        /** Lo que se considera «buena calidad»: el lado mayor de la foto, en píxeles. */
+        const val GOOD_IMAGE_SIDE = 500
+
+        /** ¿Se sabe que es pequeña (miniatura, icono)? Si no se sabe el tamaño, se deja. */
+        fun isLowQuality(item: GrabItem, realWidth: Int = 0, realHeight: Int = 0): Boolean {
+            if (item.kind != MediaKind.IMAGE) return false
+            val (w, h) = if (realWidth > 0) realWidth to realHeight else sizeOf(item)
+            return w > 0 && h > 0 && maxOf(w, h) < GOOD_IMAGE_SIDE
+        }
+
+        fun matches(item: GrabItem, filter: GrabFilter): Boolean {
+            val gif = item.kind == MediaKind.IMAGE && MediaSniffer.extensionOf(item.url) == "gif"
+            return when (filter) {
+                GrabFilter.ALL -> true
+                GrabFilter.PHOTOS -> item.kind == MediaKind.IMAGE && !gif
+                GrabFilter.GIFS -> gif
+                GrabFilter.VIDEOS -> item.kind == MediaKind.VIDEO
+            }
+        }
+
+        /**
+         * De varias versiones de la misma imagen o vídeo, deja solo la de mejor
+         * calidad (y anota su tamaño). En Pinterest pide directamente el original.
+         */
         fun dropSmallVariants(items: List<GrabItem>): List<GrabItem> {
             val best = linkedMapOf<String, GrabItem>()
-            items.forEach { item ->
-                val key = if (item.kind == MediaKind.IMAGE) variantKey(item.url) else item.url
+            items.forEach { raw ->
+                if (raw.kind == MediaKind.IMAGE && isPinterestAvatar(raw.url)) return@forEach
+                val item = if (raw.kind == MediaKind.IMAGE) pinterestBest(raw) else raw
+                val key = when (item.kind) {
+                    MediaKind.IMAGE -> variantKey(item.url)
+                    MediaKind.VIDEO -> videoKey(item.url)
+                    else -> item.url
+                }
                 val current = best[key]
-                if (current == null || better(item, current)) best[key] = item
+                if (current == null) {
+                    best[key] = item
+                } else if (item.kind == MediaKind.VIDEO) {
+                    if (videoQuality(item.url) > videoQuality(current.url) ||
+                        item.width * item.height > current.width * current.height
+                    ) best[key] = item
+                } else if (current.fallback != null && item.fallback == null && item.url.startsWith("https://i.pinimg.com/originals/", true)) {
+                    // Un original de Pinterest visto de verdad gana al adivinado (acierta el formato: .png, .gif…).
+                    best[key] = item
+                } else if (pinRank(item.url) > 0 && pinRank(current.url) > 0 && item.fallback == null && current.fallback == null) {
+                    if (pinRank(item.url) > pinRank(current.url)) best[key] = item
+                } else if (item.fallback == null || current.fallback != null) {
+                    if (better(item, current)) best[key] = item
+                }
             }
             return best.values.map { item ->
                 if (item.kind != MediaKind.IMAGE || (item.width > 0 && item.height > 0)) item

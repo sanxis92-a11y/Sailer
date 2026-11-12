@@ -42,6 +42,12 @@
     <string name="adblock_site_on">Turn on blocker for this site</string>
     <string name="images_row">Images on this page</string>
     <string name="images_count">%d images</string>
+    <string name="filter_all">All</string>
+    <string name="filter_photos">Photos</string>
+    <string name="filter_gifs">GIFs</string>
+    <string name="filter_videos">Videos</string>
+    <string name="filter_best_only">Best quality only (hide thumbnails and small copies)</string>
+    <string name="images_count_filtered">%1$d shown · %2$d hidden</string>
     <string name="images_view">View</string>
     <string name="images_hint">Tap the ones you want to save</string>
     <string name="images_select_all">Select all</string>

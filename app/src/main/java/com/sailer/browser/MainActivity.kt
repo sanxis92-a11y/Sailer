@@ -48,6 +48,7 @@ import com.sailer.browser.media.MediaInspector
 import com.sailer.browser.media.StorePolicy
 import com.sailer.browser.media.MediaOption
 import com.sailer.browser.media.GrabItem
+import com.sailer.browser.media.GrabFilter
 import com.sailer.browser.media.PageImage
 import com.sailer.browser.media.LinkGrabber
 import com.sailer.browser.media.PageCollector
@@ -79,6 +80,8 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -669,8 +672,14 @@ class MainActivity : SecureActivity(),
         val view = SheetImagesBinding.inflate(layoutInflater)
         sheet.setContentView(view.root)
 
-        val items = initial.distinctBy { it.url }.toMutableList()
+        val items = LinkGrabber.dropSmallVariants(initial.distinctBy { it.url }).toMutableList()
+        /** Lo que se ve en la cuadrícula: [items] pasado por el filtro de tipo y de calidad. */
+        val shown = mutableListOf<GrabItem>()
         val selected = linkedSetOf<String>()
+        /** Tamaño real de cada foto, conocido al cargar su miniatura. */
+        val realSize = HashMap<String, Pair<Int, Int>>()
+        var filter = GrabFilter.ALL
+        var bestOnly = true
         val userAgent = tabManager.current?.webView?.settings?.userAgentString ?: WebSettings.getDefaultUserAgent(this)
         val inspector = MediaInspector(this)
         val cache = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
@@ -683,6 +692,16 @@ class MainActivity : SecureActivity(),
         val details = linkedSetOf<String>().apply { addAll(initialDetails) }
         val grabber = LinkGrabber(this, userAgent)
 
+        fun isLow(item: GrabItem): Boolean {
+            val (w, h) = realSize[item.url] ?: (0 to 0)
+            return LinkGrabber.isLowQuality(item, w, h)
+        }
+
+        fun applyFilter() {
+            shown.clear()
+            items.filterTo(shown) { LinkGrabber.matches(it, filter) && !(bestOnly && isLow(it)) }
+        }
+
         fun addFound(found: List<GrabItem>) {
             // Juntar con lo que ya hay y quitar las versiones pequeñas de la misma foto.
             val merged = LinkGrabber.dropSmallVariants(items + found.filter { StorePolicy.allowsDownload(it.url, it.referer) })
@@ -690,6 +709,7 @@ class MainActivity : SecureActivity(),
             selected.retainAll(kept)
             items.clear()
             items.addAll(merged)
+            applyFilter()
         }
 
         fun updateDeepButton() {
@@ -697,27 +717,56 @@ class MainActivity : SecureActivity(),
             if (deepJob == null) view.deepScan.text = getString(R.string.grab_deep, minOf(details.size, LinkGrabber.MAX_DETAILS))
         }
 
+        fun chosen(): List<GrabItem> = shown.filter { it.url in selected }
+
         fun refresh() {
-            view.title.text = getString(R.string.images_count, items.size)
-            view.download.isEnabled = selected.isNotEmpty()
-            view.download.text = if (selected.isEmpty()) getString(R.string.images_download_none)
-            else getString(R.string.images_download, selected.size)
-            view.selectAll.setText(if (selected.size == items.size && items.isNotEmpty()) R.string.images_select_none else R.string.images_select_all)
+            val hidden = items.size - shown.size
+            view.title.text = if (hidden > 0) getString(R.string.images_count_filtered, shown.size, hidden)
+            else getString(R.string.images_count, shown.size)
+            val count = chosen().size
+            view.download.isEnabled = count > 0
+            view.download.text = if (count == 0) getString(R.string.images_download_none)
+            else getString(R.string.images_download, count)
+            view.selectAll.setText(if (count == shown.size && shown.isNotEmpty()) R.string.images_select_none else R.string.images_select_all)
         }
 
-        val adapter = object : BaseAdapter() {
-            override fun getCount() = items.size
-            override fun getItem(position: Int) = items[position]
+        lateinit var adapter: BaseAdapter
+
+        /** La foto ya se puede ver: se apunta su tamaño real o, si no existe, se usa la de reserva. */
+        fun onPreview(item: GrabItem, preview: MediaInspector.Preview?) {
+            val index = items.indexOfFirst { it.url == item.url }
+            if (preview == null) {
+                val backup = item.fallback ?: return
+                LinkGrabber.markMissing(item.url)
+                if (index >= 0) items[index] = item.copy(url = backup, fallback = null)
+                if (selected.remove(item.url)) selected.add(backup)
+            } else {
+                cache.put(item.url, preview.bitmap)
+                realSize[item.url] = preview.width to preview.height
+                if (index >= 0 && item.width == 0) items[index] = item.copy(width = preview.width, height = preview.height)
+            }
+            applyFilter()
+            adapter.notifyDataSetChanged()
+            refresh()
+        }
+
+        adapter = object : BaseAdapter() {
+            override fun getCount() = shown.size
+            override fun getItem(position: Int) = shown[position]
             override fun getItemId(position: Int) = position.toLong()
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val cell = convertView?.let { ItemImageBinding.bind(it) } ?: ItemImageBinding.inflate(layoutInflater, parent, false)
-                val item = items[position]
+                val item = shown[position]
                 val isImage = item.kind == MediaKind.IMAGE
+                val (rw, rh) = realSize[item.url] ?: (item.width to item.height)
+                val quality = if (item.kind == MediaKind.VIDEO) LinkGrabber.videoQuality(item.url) else 0
                 cell.size.text = when {
-                    item.width > 0 && item.height > 0 -> "${item.width}×${item.height}"
+                    rw > 0 && rh > 0 -> "${rw}×${rh}"
+                    quality > 0 -> "${quality}p"
                     !isImage -> URLUtil.guessFileName(item.url, null, null).take(24)
                     else -> ""
                 }
+                if (isImage && MediaSniffer.extensionOf(item.url) == "gif") cell.size.text = "GIF " + cell.size.text
                 cell.size.visibility = if (cell.size.text.isEmpty()) View.GONE else View.VISIBLE
                 cell.icon.visibility = if (isImage) View.GONE else View.VISIBLE
                 cell.icon.text = if (item.kind == MediaKind.AUDIO) "🎵" else "🎬"
@@ -728,26 +777,43 @@ class MainActivity : SecureActivity(),
                 cell.image.setImageBitmap(bitmap)
                 if (isImage && bitmap == null && item.url !in loading) {
                     loading[item.url] = lifecycleScope.launch {
-                        val loaded = limit.withPermit { inspector.loadThumbnail(item.url, item.referer, userAgent) }
+                        val loaded = limit.withPermit { inspector.loadPreview(item.url, item.referer, userAgent) }
                         loading.remove(item.url)
-                        if (loaded != null) {
-                            cache.put(item.url, loaded)
-                            notifyDataSetChanged()
-                        }
+                        onPreview(item, loaded)
                     }
                 }
                 return cell.root
             }
         }
+        applyFilter()
         view.grid.adapter = adapter
         view.grid.setOnItemClickListener { _, _, position, _ ->
-            val url = items[position].url
+            val url = shown.getOrNull(position)?.url ?: return@setOnItemClickListener
             if (!selected.remove(url)) selected.add(url)
             adapter.notifyDataSetChanged()
             refresh()
         }
         view.selectAll.setOnClickListener {
-            if (selected.size == items.size) selected.clear() else selected.addAll(items.map { it.url })
+            val visible = shown.map { it.url }
+            if (chosen().size == shown.size) selected.removeAll(visible.toSet()) else selected.addAll(visible)
+            adapter.notifyDataSetChanged()
+            refresh()
+        }
+        // Filtros: tipo de archivo y «solo la mejor calidad».
+        view.filters.setOnCheckedStateChangeListener { _, ids ->
+            filter = when (ids.firstOrNull()) {
+                R.id.filterPhotos -> GrabFilter.PHOTOS
+                R.id.filterGifs -> GrabFilter.GIFS
+                R.id.filterVideos -> GrabFilter.VIDEOS
+                else -> GrabFilter.ALL
+            }
+            applyFilter()
+            adapter.notifyDataSetChanged()
+            refresh()
+        }
+        view.bestOnly.setOnCheckedChangeListener { _, checked ->
+            bestOnly = checked
+            applyFilter()
             adapter.notifyDataSetChanged()
             refresh()
         }
@@ -789,8 +855,23 @@ class MainActivity : SecureActivity(),
             }
         }
         view.download.setOnClickListener {
-            downloadItems(items.filter { it.url in selected }, pageTitle)
-            sheet.dismiss()
+            val picked = chosen()
+            view.download.isEnabled = false
+            lifecycleScope.launch {
+                // Originales adivinados (Pinterest) que aún no se han comprobado: si no existen, la de reserva.
+                val checked = picked.map { item ->
+                    async {
+                        val backup = item.fallback
+                        if (backup == null || realSize.containsKey(item.url)) item
+                        else limit.withPermit {
+                            if (inspector.exists(item.url, item.referer, userAgent)) item
+                            else item.copy(url = backup, fallback = null).also { LinkGrabber.markMissing(item.url) }
+                        }
+                    }
+                }.awaitAll()
+                downloadItems(checked, pageTitle)
+                sheet.dismiss()
+            }
         }
         refresh()
         sheet.setOnDismissListener {
