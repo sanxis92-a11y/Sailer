@@ -66,28 +66,28 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                android:text="@string/filter_all" />
+                android:text="@string/grab_filter_all" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/filterPhotos"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/filter_photos" />
+                android:text="@string/grab_filter_photos" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/filterGifs"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/filter_gifs" />
+                android:text="@string/grab_filter_gifs" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/filterVideos"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/filter_videos" />
+                android:text="@string/grab_filter_videos" />
         </com.google.android.material.chip.ChipGroup>
     </HorizontalScrollView>
 
@@ -96,7 +96,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:checked="true"
-        android:text="@string/filter_best_only"
+        android:text="@string/grab_filter_best_only"
         android:textColor="@color/text" />
 
     <GridView

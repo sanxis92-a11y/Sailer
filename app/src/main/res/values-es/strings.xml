@@ -41,11 +41,11 @@
     <string name="adblock_site_on">Activar bloqueador en esta web</string>
     <string name="images_row">Imágenes de esta página</string>
     <string name="images_count">%d imágenes</string>
-    <string name="filter_all">Todo</string>
-    <string name="filter_photos">Fotos</string>
-    <string name="filter_gifs">GIF</string>
-    <string name="filter_videos">Vídeos</string>
-    <string name="filter_best_only">Solo la mejor calidad (ocultar miniaturas y copias pequeñas)</string>
+    <string name="grab_filter_all">Todo</string>
+    <string name="grab_filter_photos">Fotos</string>
+    <string name="grab_filter_gifs">GIF</string>
+    <string name="grab_filter_videos">Vídeos</string>
+    <string name="grab_filter_best_only">Solo la mejor calidad (ocultar miniaturas y copias pequeñas)</string>
     <string name="images_count_filtered">%1$d a la vista · %2$d ocultos</string>
     <string name="images_view">Ver</string>
     <string name="images_hint">Toca las que quieras guardar</string>
