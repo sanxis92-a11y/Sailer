@@ -42,14 +42,27 @@ object LoginWall {
           if (!sites.some(function(s) { return h === s + '.com' || h.indexOf(s + '.') === 0 || h.indexOf('.' + s + '.') >= 0; })) return;
           try { Object.defineProperty(window, '__nvNoWall', { value: true, enumerable: false }); } catch (e) {}
 
+          // 0) Que la web no pueda frenar el dedo al deslizar: sus avisos bloquean el
+          //    scroll cancelando los gestos. Con «passive» el navegador no se lo permite.
+          try {
+            var add = EventTarget.prototype.addEventListener;
+            EventTarget.prototype.addEventListener = function(type, fn, opts) {
+              if ((type === 'touchmove' || type === 'touchstart' || type === 'wheel') &&
+                  (this === window || this === document || this === document.documentElement || this === document.body)) {
+                opts = (typeof opts === 'object' && opts) ? Object.assign({}, opts, { passive: true }) : { passive: true, capture: !!opts };
+              }
+              return add.call(this, type, fn, opts);
+            };
+          } catch (e) {}
+
           // 1) Ventanas conocidas de Pinterest y el scroll bloqueado.
           var css = [
             '[data-test-id="fullPageSignupModal"]', '[data-test-id="signup"]', '[data-test-id="unauth-signup-modal"]',
             '[data-test-id="giftWrap"]', '[data-test-id="bottom-right-upsell"]', '[data-test-id="floating-app-upsell"]',
             '[data-test-id="unauthBottomBar"]', '[data-test-id="unauth-bottom-upsell"]', '[data-test-id="login-modal-default"]',
-            '[data-test-id="signupModal"]', '[data-test-id="full-page-signup-close-button"]'
+            '[data-test-id="signupModal"]'
           ].join(',') + '{display:none!important}' +
-            'html,body{overflow:auto!important;height:auto!important}';
+            'html,body{overflow:auto!important;touch-action:auto!important;overscroll-behavior:auto!important}';
           function addStyle() {
             if (document.getElementById('__nvNoWallCss')) return;
             var st = document.createElement('style');
@@ -58,44 +71,67 @@ object LoginWall {
             (document.head || document.documentElement).appendChild(st);
           }
 
-          // 2) Cualquier capa fija grande que pida iniciar sesión o registrarse.
-          var WORDS = /(log ?in|sign ?up|iniciar sesi[oó]n|inicia sesi[oó]n|reg[ií]strate|continuar con google|continue with google|crear cuenta|create account|únete|join pinterest)/i;
-          function cover(el) {
-            var r = el.getBoundingClientRect();
-            return r.width >= innerWidth * 0.6 && r.height >= innerHeight * 0.3;
+          // 2) Capas fijas que piden iniciar sesión o registrarse. Solo se miran las
+          //    capas de arriba de la página (ahí van siempre estos avisos), para no
+          //    frenar el móvil revisando miles de fotos.
+          var WORDS = /(log ?in|sign ?up|iniciar sesi[oó]n|inicia sesi[oó]n|reg[ií]strate|continuar con google|continue with google|crear cuenta|create account|únete|join pinterest|ver más|see more)/i;
+          function candidates() {
+            var out = [], level = document.body ? [document.body] : [];
+            for (var depth = 0; depth < 6 && level.length && out.length < 600; depth++) {
+              var next = [];
+              for (var i = 0; i < level.length; i++) {
+                var kids = level[i].children;
+                for (var j = 0; j < kids.length && out.length < 600; j++) { out.push(kids[j]); next.push(kids[j]); }
+              }
+              level = next;
+            }
+            return out;
           }
+          var hidden = false;
           function sweep() {
             addStyle();
-            var all = document.body ? document.body.querySelectorAll('div, section, aside') : [];
-            for (var i = 0; i < all.length && i < 6000; i++) {
-              var el = all[i];
+            var list = candidates();
+            for (var i = 0; i < list.length; i++) {
+              var el = list[i];
+              if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
               var cs = getComputedStyle(el);
+              // Fotos borrosas detrás del aviso.
+              if (cs.filter && cs.filter.indexOf('blur') >= 0) el.style.setProperty('filter', 'none', 'important');
               if (cs.position !== 'fixed' || cs.display === 'none') continue;
-              if (!cover(el)) {
-                // Barras pegadas abajo con «Regístrate».
-                var r = el.getBoundingClientRect();
-                if (r.bottom >= innerHeight - 2 && r.height < innerHeight * 0.35 && WORDS.test(el.innerText || '') &&
-                    !el.querySelector('input[type="search"]')) el.style.setProperty('display', 'none', 'important');
-                continue;
-              }
-              var text = el.innerText || '';
-              // Fondo oscuro sin texto que acompaña a la ventana, o la ventana con el aviso.
-              if (WORDS.test(text) || (text.trim().length === 0 && parseFloat(cs.opacity) > 0 && cs.backgroundColor !== 'rgba(0, 0, 0, 0)')) {
-                if (!el.querySelector('[data-test-id="pinWrapper"], [data-grid-item]')) el.style.setProperty('display', 'none', 'important');
+              var r = el.getBoundingClientRect();
+              var big = r.width >= innerWidth * 0.6 && r.height >= innerHeight * 0.3;
+              var text = (el.innerText || '').slice(0, 2000);
+              var hasPins = !!el.querySelector('[data-test-id="pinWrapper"], [data-grid-item]');
+              if (hasPins || el.querySelector('input[type="search"]')) continue;
+              if (big && (WORDS.test(text) || text.trim().length === 0)) {
+                // El aviso, o la capa (oscura o transparente) que hay debajo y se traga los toques.
+                el.style.setProperty('display', 'none', 'important');
+                hidden = true;
+              } else if (!big && r.bottom >= innerHeight - 2 && r.height < innerHeight * 0.35 && WORDS.test(text)) {
+                el.style.setProperty('display', 'none', 'important');
               }
             }
             [document.documentElement, document.body].forEach(function(e) {
               if (!e) return;
               e.style.removeProperty('overflow');
-              if (e.style.position === 'fixed') e.style.removeProperty('position');
+              e.style.removeProperty('touch-action');
+              if (e.style.position === 'fixed') {
+                // Bloqueo de scroll con «position: fixed; top: -Npx»: volver a donde estaba.
+                var y = -parseInt(e.style.top || '0', 10) || 0;
+                e.style.removeProperty('position');
+                e.style.removeProperty('top');
+                if (y) window.scrollTo(0, y);
+              }
             });
           }
           var timer = 0;
-          function soon() { if (!timer) timer = setTimeout(function() { timer = 0; sweep(); }, 300); }
+          function soon() { if (!timer) timer = setTimeout(function() { timer = 0; sweep(); }, 800); }
           function start() {
             sweep();
-            new MutationObserver(soon).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
-            setInterval(sweep, 2000);
+            new MutationObserver(soon).observe(document.body, { childList: true });
+            new MutationObserver(soon).observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
+            new MutationObserver(soon).observe(document.body, { attributes: true, attributeFilter: ['style', 'class'] });
+            setInterval(sweep, 2500);
           }
           if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
         })();
