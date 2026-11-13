@@ -36,7 +36,14 @@ data class GrabItem(
 enum class GrabFilter { ALL, PHOTOS, GIFS, VIDEOS }
 
 /** Lo encontrado en una página: archivos, páginas de detalle de cada miniatura y la página siguiente. */
-class GrabPage(val items: List<GrabItem>, val details: List<String>, val next: String?, val title: String)
+class GrabPage(
+    val items: List<GrabItem>,
+    val details: List<String>,
+    val next: String?,
+    val title: String,
+    /** Enlaces de la misma web (para encontrar la paginación por números). */
+    val links: List<String> = emptyList(),
+)
 
 /**
  * Recolector al estilo JDownloader (solo versión personal). De cada página saca:
@@ -50,21 +57,48 @@ class GrabPage(val items: List<GrabItem>, val details: List<String>, val next: S
  */
 class LinkGrabber(private val context: Context, private val userAgent: String) {
 
-    /** Recorre [startUrl] y sus páginas siguientes (hasta [maxPages]); [onPage] recibe cada una. */
+    /**
+     * Recorre [startUrl] y sus páginas siguientes (hasta [maxPages]); [onPage] recibe cada una.
+     * Busca la siguiente por el botón «Siguiente» o, si no lo hay, por los números de
+     * página (1 2 3…, ?page=, /page/2/, ?start=20…). Si una página falla lo reintenta y,
+     * si ya sabe cómo se numeran, prueba la siguiente aunque falte el enlace. Para cuando
+     * dos páginas seguidas no traen nada nuevo.
+     */
     suspend fun crawl(
         startUrl: String,
         maxPages: Int = MAX_PAGES,
         onPage: suspend (pageNumber: Int, page: GrabPage) -> Unit,
     ) = withContext(Dispatchers.IO) {
         val visited = mutableSetOf<String>()
+        val seenItems = HashSet<String>()
+        var pattern: Pagination.Pattern? = null
         var url: String? = startUrl
+        var referer: String? = null
         var number = 0
-        while (url != null && number < maxPages && visited.add(url)) {
+        var dry = 0
+        var failures = 0
+        while (url != null && number < maxPages && visited.add(url.substringBefore('#'))) {
             coroutineContext.ensureActive()
+            val current: String = url
+            val page = readPageOrNull(current, referer)
+            if (page == null) {
+                // Página que no se puede leer: si se sabe la numeración, se prueba la siguiente.
+                failures++
+                url = if (failures < 2) pattern?.let { Pagination.guess(current, it)?.url } else null
+                continue
+            }
+            failures = 0
             number++
-            val page = runCatching { readPage(url) }.getOrNull() ?: break
+            val fresh = page.items.count { seenItems.add(it.url) }
+            dry = if (fresh == 0 && number > 1) dry + 1 else 0
             onPage(number, page)
-            url = page.next
+            if (dry >= 2) break
+            val numbered = Pagination.next(current, page.links, pattern)
+            if (numbered != null) pattern = numbered.pattern
+            url = page.next?.takeIf { it.substringBefore('#') !in visited }
+                ?: numbered?.url
+                ?: pattern?.let { Pagination.guess(current, it)?.url }
+            referer = current
         }
     }
 
@@ -93,21 +127,47 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         return GrabItem(url, kind)
     }
 
-    private fun fetchHtml(url: HttpUrl): String? {
-        val request = Request.Builder().url(url).header("User-Agent", userAgent).build()
-        return HttpClients.get(context).newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return null
-            if (!response.header("Content-Type").orEmpty().contains("html", ignoreCase = true)) return null
-            response.body?.string().orEmpty().take(MAX_HTML)
+    /** Lee una página como un navegador (con tu sesión y de dónde vienes); reintenta si la web falla. */
+    private fun fetchHtml(url: HttpUrl, referer: String? = null): String? {
+        repeat(3) { attempt ->
+            if (attempt > 0) Thread.sleep(1000L * attempt)
+            val request = Request.Builder().url(url)
+                .header("User-Agent", userAgent)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .header("Accept-Language", java.util.Locale.getDefault().toLanguageTag() + ",en;q=0.5")
+                .apply { referer?.takeIf { it.startsWith("https://") }?.let { header("Referer", it) } }
+                .build()
+            val result = runCatching {
+                HttpClients.get(context).newCall(request).execute().use { response ->
+                    when {
+                        // Demasiadas peticiones o fallo del servidor: se espera y se reintenta.
+                        response.code == 429 || response.code >= 500 -> null
+                        !response.isSuccessful -> return null
+                        else -> {
+                            val type = response.header("Content-Type").orEmpty()
+                            if (type.isNotEmpty() && !type.contains("html", true) && !type.contains("xml", true)) return null
+                            response.body?.string().orEmpty().take(MAX_HTML)
+                        }
+                    }
+                }
+            }.getOrNull()
+            if (result != null) return result
         }
+        return null
     }
 
-    fun readPage(pageUrl: String): GrabPage {
-        val base = pageUrl.toHttpUrlOrNull() ?: return GrabPage(emptyList(), emptyList(), null, "")
-        val html = fetchHtml(base) ?: return GrabPage(emptyList(), emptyList(), null, "")
+    fun readPage(pageUrl: String): GrabPage =
+        readPageOrNull(pageUrl, null) ?: GrabPage(emptyList(), emptyList(), null, "")
+
+    private fun readPageOrNull(pageUrl: String, referer: String?): GrabPage? {
+        val base = pageUrl.toHttpUrlOrNull() ?: return null
+        val html = fetchHtml(base, referer) ?: return null
         val title = titleOf(html)
         val (items, details) = findItems(html, base, pageUrl, title)
-        return GrabPage(items, details, findNext(html, base), title)
+        val links = ANCHOR.findAll(html).mapNotNull { m -> resolve(base, attr(m.groupValues[1], "href")) }
+            .filter { it.toHttpUrlOrNull()?.host == base.host }
+            .distinct().take(MAX_LINKS).toList()
+        return GrabPage(items, details, findNext(html, base), title, links)
     }
 
     /** Imagen principal de una página de detalle: og:image, o la más grande de sus <img>. */
@@ -254,7 +314,8 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         text.replace("&amp;", "&").replace("&#038;", "&").replace("&quot;", "\"").replace("&#39;", "'")
 
     companion object {
-        const val MAX_PAGES = 30
+        const val MAX_PAGES = 150
+        private const val MAX_LINKS = 3000
         const val MAX_DETAILS = 200
         private const val MAX_ITEMS = 1500
         private const val MAX_HTML = 3_000_000
