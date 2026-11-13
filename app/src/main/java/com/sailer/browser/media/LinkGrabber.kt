@@ -8,6 +8,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -59,6 +60,8 @@ class GrabPage(
  */
 class LinkGrabber(private val context: Context, private val userAgent: String) {
 
+    private val extractors = SiteExtractors(context, userAgent)
+
     /**
      * Recorre [startUrl] y sus páginas siguientes (hasta [maxPages]); [onPage] recibe cada una.
      * Busca la siguiente por el botón «Siguiente» o, si no lo hay, por los números de
@@ -70,6 +73,7 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         startUrl: String,
         maxPages: Int = MAX_PAGES,
         useBrowser: Boolean = BuildConfig.GRABBER,
+        resume: Boolean = false,
         onPage: suspend (pageNumber: Int, page: GrabPage) -> Unit,
     ) = withContext(Dispatchers.IO) {
         val visited = mutableSetOf<String>()
@@ -81,14 +85,23 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         var dry = 0
         var failures = 0
         var hidden: HiddenReader? = null
+        // Seguir donde se quedó la última vez (mientras la app siga abierta).
+        val saved = if (resume) progress[startUrl] else null
+        if (saved != null) {
+            url = saved.next
+            number = saved.pages
+            pattern = saved.pattern
+        }
         try {
         while (url != null && number < maxPages && visited.add(url.substringBefore('#'))) {
             coroutineContext.ensureActive()
             val current: String = url
-            var page = readPageOrNull(current, referer)
+            // Webs con pieza especial (Reddit, Redgifs…): se pide la lista directamente a la web.
+            val special = if (BuildConfig.GRABBER) runCatching { extractors.read(current) }.getOrNull() else null
+            var page = special ?: readPageOrNull(current, referer)
             // Página «vacía» (galería montada con JavaScript) o sin página siguiente (galerías con
             // «Cargar más» o scroll infinito): se vuelve a leer con el navegador oculto.
-            if (useBrowser && (page == null || page.items.isEmpty() || (page.next == null && Pagination.next(current, page.links, pattern) == null))) {
+            if (useBrowser && special == null && (page == null || page.items.isEmpty() || (page.next == null && Pagination.next(current, page.links, pattern) == null))) {
                 val reader = hidden ?: HiddenReader(context, userAgent).also { hidden = it }
                 val steps = if (page == null || page.items.isEmpty()) 15 else if (maxPages == 1) 25 else 60
                 val rendered = reader.read(current, steps)
@@ -112,7 +125,12 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
                 ?: numbered?.url
                 ?: pattern?.let { Pagination.guess(current, it)?.url }
             referer = current
+            val nextUrl = url
+            if (nextUrl != null) progress[startUrl] = Progress(nextUrl, number, pattern) else progress.remove(startUrl)
+            // Una pequeña pausa entre páginas para que la web no nos tome por un robot.
+            if (nextUrl != null && special == null) delay(POLITE_DELAY_MS)
         }
+        if (url == null) progress.remove(startUrl)
         } finally {
             withContext(NonCancellable) { hidden?.close() }
         }
@@ -181,7 +199,11 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
                 HttpClients.get(context).newCall(request).execute().use { response ->
                     when {
                         // Demasiadas peticiones o fallo del servidor: se espera y se reintenta.
-                        response.code == 429 || response.code >= 500 -> null
+                        response.code == 429 || response.code >= 500 -> {
+                            // La web pide esperar: se respeta (hasta 10 segundos).
+                            response.header("Retry-After")?.toLongOrNull()?.coerceIn(1, 10)?.let { Thread.sleep(it * 1000) }
+                            null
+                        }
                         !response.isSuccessful -> return null
                         else -> {
                             val type = response.header("Content-Type").orEmpty()
@@ -210,11 +232,19 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         return GrabPage(items, details, findNext(html, base), title, links)
     }
 
-    /** Imagen principal de una página de detalle: og:image, o la más grande de sus <img>. */
+    /**
+     * Imagen principal de una página de detalle: en webs de alojar fotos, la foto
+     * que muestran; si no, og:image, o la más grande de sus <img>.
+     */
     private fun mainImage(pageUrl: String): GrabItem? {
         val base = pageUrl.toHttpUrlOrNull() ?: return null
         val html = fetchHtml(base) ?: return null
         val title = titleOf(html)
+        if (isImageHost(pageUrl)) {
+            IMG.findAll(html).firstOrNull { HOST_MAIN_IMG.containsMatchIn(it.value) }?.let { img ->
+                resolve(base, imageSource(img.value))?.let { return GrabItem(it, MediaKind.IMAGE, referer = pageUrl, album = title) }
+            }
+        }
         META.findAll(html).forEach { tag ->
             val property = (attr(tag.value, "property") ?: attr(tag.value, "name"))?.lowercase()
             if (property == "og:image" || property == "og:image:secure_url" || property == "twitter:image") {
@@ -252,7 +282,9 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
             if (kind != null) {
                 add(href, kind)
                 thumbsInLinks.addAll(imgs.mapNotNull { resolve(base, it) })
-            } else if (imgs.isNotEmpty() && target.toHttpUrlOrNull()?.host == base.host && target != base.toString()) {
+            } else if (imgs.isNotEmpty() && target != base.toString() &&
+                (target.toHttpUrlOrNull()?.host == base.host || isImageHost(target))
+            ) {
                 details.add(target.substringBefore('#'))
             }
         }
@@ -355,6 +387,32 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
 
     companion object {
         const val MAX_PAGES = 150
+
+        /** Webs de alojar fotos que usan los foros: la miniatura lleva a su página con la foto grande. */
+        private val IMAGE_HOSTS = listOf(
+            "imagebam.com", "imgbox.com", "pixhost.to", "imagetwist.com", "postimg.cc", "postimages.org",
+            "ibb.co", "imagevenue.com", "turboimagehost.com", "imx.to", "fastpic.org", "pimpandhost.com",
+            "imgur.com", "imagexport.com", "picstate.com", "vipr.im", "imgspice.com",
+        )
+
+        fun isImageHost(url: String): Boolean {
+            val host = url.toHttpUrlOrNull()?.host?.lowercase() ?: return false
+            return IMAGE_HOSTS.any { host == it || host.endsWith(".$it") }
+        }
+
+        /** La foto principal en esas webs (id o clase típicos). */
+        private val HOST_MAIN_IMG = Regex(
+            """\s(?:id|class)\s*=\s*["'][^"']*\b(img|image|main-image|image-img|show_image|pic|mainImage|imageContainer|centred|img-responsive)\b""",
+            RegexOption.IGNORE_CASE,
+        )
+        private const val POLITE_DELAY_MS = 400L
+
+        /** Dónde se quedó cada recorrido (solo en memoria: no se guarda nada en el móvil). */
+        private class Progress(val next: String, val pages: Int, val pattern: Pagination.Pattern?)
+        private val progress = java.util.concurrent.ConcurrentHashMap<String, Progress>()
+
+        /** Páginas ya recorridas de [startUrl] si se cortó a medias; null si no hay nada que seguir. */
+        fun savedProgress(startUrl: String): Int? = progress[startUrl]?.pages
         private const val MAX_LINKS = 3000
         const val MAX_DETAILS = 200
         private const val MAX_ITEMS = 1500

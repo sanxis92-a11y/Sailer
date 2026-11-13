@@ -72,11 +72,14 @@ class Downloader(private val context: Context) {
     suspend fun download(request: DownloadRequest, state: DownloadState, onProgress: (Int) -> Unit): Vault.Entry =
         withContext(Dispatchers.IO) {
             state.workDir.mkdirs()
-            when {
+            val entry = when {
                 request.url.startsWith("data:") -> saveDataUrl(request)
                 request.kind == MediaKind.HLS || request.kind == MediaKind.DASH -> segmented(request, state, onProgress)
                 else -> direct(request, state, onProgress)
             }
+            // Para avisar la próxima vez de que ya lo tienes.
+            if (!request.url.startsWith("data:")) runCatching { vault.tagSource(entry, request.url) }
+            entry
         }
 
     // ---- Archivo directo (se reanuda con "Range") ----

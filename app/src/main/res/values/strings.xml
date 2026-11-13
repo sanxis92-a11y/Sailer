@@ -53,6 +53,10 @@
     <string name="autoscroll_start">Start</string>
     <string name="autoscroll_running">Scrolling the page… %d files seen</string>
     <string name="autoscroll_stop">Stop</string>
+    <string name="grab_limit_title">How far should it go?</string>
+    <string name="grab_limit_pages">Up to %d pages</string>
+    <string name="grab_resume">Continue where it stopped (%d pages done)</string>
+    <string name="grab_owned">✓ Saved</string>
     <string name="images_view">View</string>
     <string name="images_hint">Tap the ones you want to save</string>
     <string name="images_select_all">Select all</string>

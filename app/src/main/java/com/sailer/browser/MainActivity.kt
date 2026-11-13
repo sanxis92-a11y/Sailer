@@ -749,6 +749,13 @@ class MainActivity : SecureActivity(),
         var deepJob: Job? = null
         val details = linkedSetOf<String>().apply { addAll(initialDetails) }
         val grabber = LinkGrabber(this, userAgent)
+        /** Lo que ya está en la carpeta segura (se marca y no entra en «Todas»). */
+        val owned = Vault.get(this).downloadedHashes()
+        val ownedCache = HashMap<String, Boolean>()
+        fun isOwned(item: GrabItem): Boolean = ownedCache.getOrPut(item.url) {
+            Vault.hashUrl(UrlUtils.upgradeToHttps(item.url)) in owned ||
+                item.fallback?.let { Vault.hashUrl(it) in owned } == true
+        }
 
         fun isLow(item: GrabItem): Boolean {
             val (w, h) = realSize[item.url] ?: (0 to 0)
@@ -785,7 +792,8 @@ class MainActivity : SecureActivity(),
             view.download.isEnabled = count > 0
             view.download.text = if (count == 0) getString(R.string.images_download_none)
             else getString(R.string.images_download, count)
-            view.selectAll.setText(if (count == shown.size && shown.isNotEmpty()) R.string.images_select_none else R.string.images_select_all)
+            val freshCount = shown.count { !isOwned(it) }
+            view.selectAll.setText(if (count > 0 && count >= freshCount) R.string.images_select_none else R.string.images_select_all)
         }
 
         lateinit var adapter: BaseAdapter
@@ -825,6 +833,7 @@ class MainActivity : SecureActivity(),
                     else -> ""
                 }
                 if (isImage && MediaSniffer.extensionOf(item.url) == "gif") cell.size.text = "GIF " + cell.size.text
+                if (isOwned(item)) cell.size.text = getString(R.string.grab_owned) + " " + cell.size.text
                 cell.size.visibility = if (cell.size.text.isEmpty()) View.GONE else View.VISIBLE
                 cell.icon.visibility = if (isImage) View.GONE else View.VISIBLE
                 cell.icon.text = if (item.kind == MediaKind.AUDIO) "🎵" else "🎬"
@@ -853,7 +862,8 @@ class MainActivity : SecureActivity(),
         }
         view.selectAll.setOnClickListener {
             val visible = shown.map { it.url }
-            if (chosen().size == shown.size) selected.removeAll(visible.toSet()) else selected.addAll(visible)
+            val fresh = shown.filterNot { isOwned(it) }.map { it.url }
+            if (chosen().size >= fresh.size && chosen().isNotEmpty()) selected.removeAll(visible.toSet()) else selected.addAll(fresh)
             adapter.notifyDataSetChanged()
             refresh()
         }
@@ -884,10 +894,10 @@ class MainActivity : SecureActivity(),
         }
         if (crawlFrom != null) {
             view.morePages.visibility = View.VISIBLE
-            view.morePages.setOnClickListener {
+            fun startCrawl(maxPages: Int, resume: Boolean) {
                 view.morePages.isEnabled = false
                 crawlJob = lifecycleScope.launch {
-                    grabber.crawl(crawlFrom) { number, page ->
+                    grabber.crawl(crawlFrom, maxPages = maxPages, resume = resume) { number, page ->
                         withContext(Dispatchers.Main) {
                             addFound(page.items)
                             details.addAll(page.details)
@@ -899,6 +909,20 @@ class MainActivity : SecureActivity(),
                     }
                     view.morePages.text = getString(R.string.grab_done)
                 }
+            }
+            view.morePages.setOnClickListener {
+                // Elegir hasta dónde llegar y, si ya se empezó antes, seguir donde se quedó.
+                val limits = intArrayOf(10, 30, 100, LinkGrabber.MAX_PAGES)
+                val labels = limits.map { getString(R.string.grab_limit_pages, it) }.toMutableList()
+                val saved = LinkGrabber.savedProgress(crawlFrom)
+                if (saved != null) labels.add(0, getString(R.string.grab_resume, saved))
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.grab_limit_title)
+                    .setItems(labels.toTypedArray()) { _, which ->
+                        if (saved != null && which == 0) startCrawl(LinkGrabber.MAX_PAGES, resume = true)
+                        else startCrawl(limits[if (saved != null) which - 1 else which], resume = false)
+                    }
+                    .showSecure()
             }
         }
         // Análisis a fondo: abre la página de cada miniatura y coge su foto grande.
@@ -947,6 +971,16 @@ class MainActivity : SecureActivity(),
         sheet.show()
     }
 
+    /** ¿El nombre del archivo en la web dice algo (no es solo un código o «image.jpg»)? */
+    private fun meaningfulName(fileName: String): Boolean {
+        val base = fileName.substringBeforeLast('.').lowercase()
+        if (base.length < 3 || base in GENERIC_NAMES) return false
+        if (Regex("^[0-9a-f_-]{12,}$").matches(base)) return false
+        val digits = base.count { it.isDigit() }
+        if (base.length >= 20 && digits >= 4 && !base.contains(Regex("[a-z]{4,}"))) return false
+        return true
+    }
+
     private fun downloadItems(chosen: List<GrabItem>, pageTitle: String) {
         val tab = tabManager.current
         val allowed = chosen.filter { StorePolicy.allowsDownload(it.url, it.referer ?: tab?.url) && StorePolicy.allowsKind(it.kind) }
@@ -957,13 +991,17 @@ class MainActivity : SecureActivity(),
                 // Galería automática: carpeta de la web y, dentro, una con el nombre de la página.
                 val folder = Vault.galleryFolder(item.referer ?: tab?.url, item.album ?: pageTitle)
                 // Nombre del archivo en la web si lo tiene; si no, el título de la página numerado.
+                // Si el nombre de la web es un código sin sentido (a8f3e9…), se usa el título numerado
+                // en el mismo orden que en la página: «Título 001», «Título 002»…
                 val fromUrl = URLUtil.guessFileName(item.url, null, null)
                     .takeIf { MediaSniffer.kindForExtension(MediaSniffer.extensionOf(item.url)) == item.kind }
+                    ?.takeIf { meaningfulName(it) }
                 val name = fromUrl?.takeIf { used.add(it) }
+                val number = (i + 1).toString().padStart(if (allowed.size >= 1000) 4 else 3, '0')
                 DownloadCenter.enqueue(
                     DownloadRequest(
                         url = UrlUtils.upgradeToHttps(item.url),
-                        title = if (name == null && allowed.size > 1) "$pageTitle ${i + 1}" else pageTitle,
+                        title = if (name == null && allowed.size > 1) "$pageTitle $number" else pageTitle,
                         kind = item.kind,
                         referer = item.referer ?: tab?.url,
                         userAgent = tab?.webView?.settings?.userAgentString ?: "",
@@ -1169,3 +1207,6 @@ class MainActivity : SecureActivity(),
 
 /** Tope de imágenes recordadas por pestaña (para no gastar memoria en webs infinitas). */
 private const val MAX_SEEN_IMAGES = 3000
+
+/** Nombres de archivo que no dicen nada: se cambian por el título de la página. */
+private val GENERIC_NAMES = setOf("image", "img", "photo", "foto", "picture", "download", "original", "file", "media", "video", "untitled", "default")

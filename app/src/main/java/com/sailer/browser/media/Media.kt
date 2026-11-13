@@ -104,7 +104,8 @@ object MediaSniffer {
             var link = e.closest('a');
             if (link && isImageLink(link.href)) { addImage(link.href, 0, 0); return; }
             // Si enlaza a otra página de la misma web, esa página tiene la foto grande (análisis a fondo).
-            if (link && link.href && link.origin === location.origin && link.href.split('#')[0] !== location.href.split('#')[0]) {
+            var hostRe = /(^|\.)(imagebam\.com|imgbox\.com|pixhost\.to|imagetwist\.com|postimg\.cc|postimages\.org|ibb\.co|imagevenue\.com|turboimagehost\.com|imx\.to|fastpic\.org|pimpandhost\.com|imgur\.com|imagexport\.com|picstate\.com|vipr\.im|imgspice\.com)$/i;
+            if (link && link.href && (link.origin === location.origin || hostRe.test(link.hostname)) && link.href.split('#')[0] !== location.href.split('#')[0]) {
               var d = link.href.split('#')[0];
               if (!seenDetail[d] && details.length < 300) { seenDetail[d] = true; details.push(d); }
             }

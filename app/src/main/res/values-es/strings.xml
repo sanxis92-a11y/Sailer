@@ -52,6 +52,10 @@
     <string name="autoscroll_start">Empezar</string>
     <string name="autoscroll_running">Bajando la página… %d archivos vistos</string>
     <string name="autoscroll_stop">Parar</string>
+    <string name="grab_limit_title">¿Hasta dónde busco?</string>
+    <string name="grab_limit_pages">Hasta %d páginas</string>
+    <string name="grab_resume">Seguir donde se quedó (%d páginas hechas)</string>
+    <string name="grab_owned">✓ Ya la tienes</string>
     <string name="images_view">Ver</string>
     <string name="images_hint">Toca las que quieras guardar</string>
     <string name="images_select_all">Todas</string>

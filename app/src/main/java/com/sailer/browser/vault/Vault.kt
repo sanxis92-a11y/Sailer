@@ -35,6 +35,8 @@ class Vault private constructor(context: Context) {
         val source: String = "",
         /** Título de esa página o galería. */
         val album: String = "",
+        /** Huella de la dirección del archivo (para avisar si ya lo tienes). */
+        val urlHash: String = "",
     )
 
     fun interface Listener {
@@ -283,6 +285,26 @@ class Vault private constructor(context: Context) {
         notifyChanged()
     }
 
+    /** Apunta de qué dirección se bajó [entry] (solo su huella, no la dirección). */
+    fun tagSource(entry: Entry, url: String) {
+        val hash = hashUrl(url)
+        synchronized(this) {
+            val index = entries.indexOfFirst { it.id == entry.id }
+            if (index < 0) return
+            entries[index] = entries[index].copy(urlHash = hash)
+            saveIndex()
+        }
+    }
+
+    /** ¿Ya hay en la carpeta segura un archivo bajado de esta dirección? */
+    fun hasDownloaded(url: String): Boolean {
+        val hash = hashUrl(url)
+        return synchronized(this) { entries.any { it.urlHash == hash } }
+    }
+
+    /** Huellas de todo lo bajado (para comprobar muchas direcciones de golpe). */
+    fun downloadedHashes(): Set<String> = synchronized(this) { entries.mapNotNullTo(HashSet()) { it.urlHash.ifEmpty { null } } }
+
     fun addListener(listener: Listener) = listeners.add(listener)
 
     fun removeListener(listener: Listener) = listeners.remove(listener)
@@ -316,6 +338,7 @@ class Vault private constructor(context: Context) {
                         folder = o.optString("folder"),
                         source = o.optString("source"),
                         album = o.optString("album"),
+                        urlHash = o.optString("urlHash"),
                     )
                 )
             }
@@ -336,6 +359,7 @@ class Vault private constructor(context: Context) {
                     .put("folder", e.folder)
                     .put("source", e.source)
                     .put("album", e.album)
+                    .put("urlHash", e.urlHash)
             )
         }
         val root = JSONObject().put("entries", json).put("folders", JSONArray(folders.toList()))
@@ -346,6 +370,13 @@ class Vault private constructor(context: Context) {
 
     companion object {
         /** «web» o «web/galería» para lo descargado de [pageUrl]. */
+        /** Huella de una dirección: igual para http/https y sin lo que va tras «#». */
+        fun hashUrl(url: String): String {
+            val clean = url.trim().substringBefore('#').removePrefix("https://").removePrefix("http://")
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(clean.toByteArray(Charsets.UTF_8))
+            return digest.take(16).joinToString("") { "%02x".format(it) }
+        }
+
         fun galleryFolder(pageUrl: String?, album: String?): String {
             val host = pageUrl?.takeIf { it.startsWith("http") }
                 ?.let { runCatching { android.net.Uri.parse(it).host }.getOrNull() } ?: return ""
