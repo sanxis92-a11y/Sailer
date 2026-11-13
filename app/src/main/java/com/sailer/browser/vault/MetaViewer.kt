@@ -30,19 +30,19 @@ import kotlin.concurrent.thread
 object MetaViewer {
 
     /** Etiquetas EXIF importantes, con su nombre legible, en este orden. */
-    private val MAIN_TAGS = listOf(
-        ExifInterface.TAG_DATETIME_ORIGINAL to R.string.meta_taken,
-        ExifInterface.TAG_DATETIME to R.string.meta_modified,
-        ExifInterface.TAG_MAKE to R.string.meta_make,
-        ExifInterface.TAG_MODEL to R.string.meta_model,
-        ExifInterface.TAG_LENS_MODEL to R.string.meta_lens,
-        ExifInterface.TAG_SOFTWARE to R.string.meta_software,
-        ExifInterface.TAG_ARTIST to R.string.meta_artist,
-        ExifInterface.TAG_COPYRIGHT to R.string.meta_copyright,
-        ExifInterface.TAG_IMAGE_DESCRIPTION to R.string.meta_description,
-        ExifInterface.TAG_USER_COMMENT to R.string.meta_comment,
-        ExifInterface.TAG_CAMERA_OWNER_NAME to R.string.meta_owner,
-        ExifInterface.TAG_BODY_SERIAL_NUMBER to R.string.meta_serial,
+    private val MAIN_TAGS: List<Pair<String, Int>> = listOf(
+        "DateTimeOriginal" to R.string.meta_taken,
+        "DateTime" to R.string.meta_modified,
+        "Make" to R.string.meta_make,
+        "Model" to R.string.meta_model,
+        "LensModel" to R.string.meta_lens,
+        "Software" to R.string.meta_software,
+        "Artist" to R.string.meta_artist,
+        "Copyright" to R.string.meta_copyright,
+        "ImageDescription" to R.string.meta_description,
+        "UserComment" to R.string.meta_comment,
+        "CameraOwnerName" to R.string.meta_owner,
+        "BodySerialNumber" to R.string.meta_serial,
     )
 
     fun show(activity: Activity, vault: Vault, entry: Vault.Entry) {
@@ -109,8 +109,8 @@ object MetaViewer {
             if (exif.getLatLong(latLong)) {
                 title(R.string.meta_section_location)
                 line(context.getString(R.string.meta_coordinates), "%.6f, %.6f".format(java.util.Locale.US, latLong[0], latLong[1]))
-                exif.getAttribute(ExifInterface.TAG_GPS_ALTITUDE)?.let { line(context.getString(R.string.meta_altitude), it) }
-                exif.getAttribute(ExifInterface.TAG_GPS_DATESTAMP)?.let { line(context.getString(R.string.meta_gps_date), it) }
+                exif.getAttribute("GPSAltitude")?.let { line(context.getString(R.string.meta_altitude), it) }
+                exif.getAttribute("GPSDateStamp")?.let { line(context.getString(R.string.meta_gps_date), it) }
                 anything = true
             }
             val main = MAIN_TAGS.mapNotNull { (tag, res) -> exif.getAttribute(tag)?.trim()?.takeIf { it.isNotEmpty() }?.let { res to it } }
