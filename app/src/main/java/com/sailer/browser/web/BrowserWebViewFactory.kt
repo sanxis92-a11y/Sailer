@@ -8,6 +8,7 @@ import android.webkit.WebView
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.sailer.browser.adblock.CosmeticFilter
+import com.sailer.browser.media.PageCollector
 
 /** Crea WebViews con una configuración pensada para la privacidad. */
 class BrowserWebViewFactory(
@@ -54,6 +55,8 @@ class BrowserWebViewFactory(
 
         webView.webViewClient = SailerWebViewClient(requestFilter, callbacks)
         CosmeticFilter.install(webView)
+        PageCollector.install(webView)
+        LoginWall.install(webView)
         webView.webChromeClient = chromeClient
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
             downloadHandler.onDownloadRequested(url, userAgent, contentDisposition, mimeType, contentLength)

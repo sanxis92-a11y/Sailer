@@ -10,4 +10,10 @@ class Tab(val id: Long, val webView: WebView) {
 
     /** Vídeos/audios detectados en la página actual (solo hilo principal). */
     val media = LinkedHashMap<String, DetectedMedia>()
+
+    /**
+     * Imágenes de la propia web que ha cargado la página (solo hilo principal).
+     * Así no se pierden las que una web con scroll infinito ya ha quitado de la pantalla.
+     */
+    val seenImages = LinkedHashSet<String>()
 }

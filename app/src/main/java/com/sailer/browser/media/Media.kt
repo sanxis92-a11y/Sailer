@@ -104,7 +104,8 @@ object MediaSniffer {
             var link = e.closest('a');
             if (link && isImageLink(link.href)) { addImage(link.href, 0, 0); return; }
             // Si enlaza a otra página de la misma web, esa página tiene la foto grande (análisis a fondo).
-            if (link && link.href && link.origin === location.origin && link.href.split('#')[0] !== location.href.split('#')[0]) {
+            var hostRe = /(^|\.)(imagebam\.com|imgbox\.com|pixhost\.to|imagetwist\.com|postimg\.cc|postimages\.org|ibb\.co|imagevenue\.com|turboimagehost\.com|imx\.to|fastpic\.org|pimpandhost\.com|imgur\.com|imagexport\.com|picstate\.com|vipr\.im|imgspice\.com)$/i;
+            if (link && link.href && (link.origin === location.origin || hostRe.test(link.hostname)) && link.href.split('#')[0] !== location.href.split('#')[0]) {
               var d = link.href.split('#')[0];
               if (!seenDetail[d] && details.length < 300) { seenDetail[d] = true; details.push(d); }
             }
@@ -145,6 +146,16 @@ object MediaSniffer {
           var html = document.documentElement.innerHTML.slice(0, 3000000).split('\\/').join('/');
           var re = /https:\/\/[^\s"'<>()\\]+?\.(?:jpe?g|png|webp|gif|avif)(?:\?[^\s"'<>()\\]*)?(?=["'\s<>)\\])/gi, found;
           while ((found = re.exec(html)) !== null && images.length < 1500) addImage(found[0], 0, 0);
+          // Lo que PageCollector fue apuntando mientras bajabas (webs con scroll infinito
+          // que quitan de la pantalla las fotos ya vistas, como Scrolller).
+          var mem = window.__nvSeen || [];
+          for (var k = 0; k < mem.length && images.length < 3000; k++) {
+            var it = mem[k];
+            if (it.small) continue;
+            if (it.v) { if (!seen[it.src]) { seen[it.src] = true; images.push({ src: it.src, w: it.w, h: it.h, v: 1 }); } }
+            else if (seen[it.src]) { images.forEach(function(x) { if (x.src === it.src && !x.w && it.w) { x.w = it.w; x.h = it.h; } }); }
+            else { seen[it.src] = true; images.push({ src: it.src, w: it.w, h: it.h }); }
+          }
           return JSON.stringify({ title: document.title, image: meta('og:image'), items: items, images: images, details: details });
         })();
     """
@@ -161,7 +172,7 @@ data class MediaElementInfo(
 )
 
 /** Una imagen de la página con su tamaño real en píxeles (0 si aún no se conoce). */
-data class PageImage(val url: String, val width: Int, val height: Int)
+data class PageImage(val url: String, val width: Int, val height: Int, val isVideo: Boolean = false)
 
 data class PageMediaInfo(
     val title: String,

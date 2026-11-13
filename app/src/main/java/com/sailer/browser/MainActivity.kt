@@ -48,8 +48,11 @@ import com.sailer.browser.media.MediaInspector
 import com.sailer.browser.media.StorePolicy
 import com.sailer.browser.media.MediaOption
 import com.sailer.browser.media.GrabItem
+import com.sailer.browser.media.GrabFilter
 import com.sailer.browser.media.PageImage
 import com.sailer.browser.media.LinkGrabber
+import com.sailer.browser.media.PageCollector
+import com.sailer.browser.web.LoginWall
 import com.sailer.browser.media.PageMediaInfo
 import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.databinding.ActivityMainBinding
@@ -73,11 +76,18 @@ import com.sailer.browser.vault.Bookmarks
 import com.sailer.browser.vault.BookmarksActivity
 import com.sailer.browser.vault.Vault
 import com.sailer.browser.vault.VaultActivity
+import com.google.android.material.snackbar.Snackbar
+import com.sailer.browser.media.AutoScroll
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -341,7 +351,10 @@ class MainActivity : SecureActivity(),
 
     override fun onPageStarted(view: WebView, url: String) {
         val tab = tabManager.findByWebView(view) ?: return
-        if (tab.url != url) tab.media.clear()
+        if (tab.url != url) {
+            tab.media.clear()
+            tab.seenImages.clear()
+        }
         tab.url = url
         if (tab === tabManager.current) updateMediaButton()
         if (tab === tabManager.current) showUrl(tab)
@@ -349,6 +362,8 @@ class MainActivity : SecureActivity(),
 
     override fun onPageFinished(view: WebView, url: String) {
         CosmeticFilter.applyLate(view)
+        PageCollector.applyLate(view)
+        LoginWall.applyLate(view)
         val tab = tabManager.findByWebView(view) ?: return
         tab.url = url
         if (tab === tabManager.current) showUrl(tab)
@@ -365,8 +380,33 @@ class MainActivity : SecureActivity(),
 
     override fun onResourceRequest(view: WebView, request: WebResourceRequest) {
         val url = request.url.toString()
+        if (BuildConfig.GRABBER && isImageRequest(request)) {
+            runOnUiThread {
+                val tab = tabManager.findByWebView(view) ?: return@runOnUiThread
+                if (tab.seenImages.size < MAX_SEEN_IMAGES) tab.seenImages.add(url)
+            }
+            return
+        }
         val kind = MediaSniffer.classify(url) ?: return
         runOnUiThread { addMedia(view, DetectedMedia(url, kind)) }
+    }
+
+    /** ¿Es la carga de una foto (por la extensión, o porque el navegador pide una imagen)? */
+    private fun isImageRequest(request: WebResourceRequest): Boolean {
+        if (request.isForMainFrame || !request.method.equals("GET", true)) return false
+        val url = request.url.toString()
+        if (!url.startsWith("https://")) return false
+        val kind = MediaSniffer.kindForExtension(MediaSniffer.extensionOf(url))
+        if (kind != null) return kind == MediaKind.IMAGE
+        val accept = request.requestHeaders.entries.firstOrNull { it.key.equals("Accept", true) }?.value.orEmpty()
+        return accept.startsWith("image/")
+    }
+
+    /** ¿Es [url] de la misma web que [pageUrl]? (images.ejemplo.com cuenta como ejemplo.com). */
+    private fun sameSite(url: String, pageUrl: String): Boolean {
+        fun site(u: String) = Uri.parse(u).host?.lowercase()?.split('.')?.takeLast(2)?.joinToString(".")
+        val a = site(url) ?: return false
+        return a == site(pageUrl)
     }
 
     private var lastCrashUrl: String? = null
@@ -498,7 +538,7 @@ class MainActivity : SecureActivity(),
         val imageArray = json.optJSONArray("images") ?: JSONArray()
         val images = (0 until imageArray.length()).map { i ->
             val o = imageArray.getJSONObject(i)
-            PageImage(o.optString("src"), o.optInt("w"), o.optInt("h"))
+            PageImage(o.optString("src"), o.optInt("w"), o.optInt("h"), o.optInt("v") == 1)
         }
         val detailArray = json.optJSONArray("details") ?: JSONArray()
         val details = (0 until detailArray.length()).map { detailArray.getString(it) }
@@ -516,7 +556,10 @@ class MainActivity : SecureActivity(),
 
         val images = if (BuildConfig.GRABBER) {
             info.images.filter { StorePolicy.allowsDownload(it.url, tab.url) }
-                .map { GrabItem(it.url, MediaKind.IMAGE, it.width, it.height, tab.url, pageTitle) }
+                .map { GrabItem(it.url, if (it.isVideo) MediaKind.VIDEO else MediaKind.IMAGE, it.width, it.height, tab.url, pageTitle) }
+                .plus(tab.seenImages.filter { sameSite(it, tab.url) }.map { GrabItem(it, MediaKind.IMAGE, referer = tab.url, album = pageTitle) })
+                .filter { StorePolicy.allowsDownload(it.url, tab.url) }
+                .distinctBy { it.url }
                 .let { LinkGrabber.dropSmallVariants(it) }
         } else {
             emptyList()
@@ -525,6 +568,13 @@ class MainActivity : SecureActivity(),
             view.options.addView(imagesRow(view, images.size) {
                 sheet.dismiss()
                 showImagePicker(images, pageTitle, tab.url.takeIf { it.startsWith("https://") }, info.details)
+            })
+        }
+        // Webs con scroll infinito o «Cargar más»: bajar sola hasta el final y recogerlo todo.
+        if (BuildConfig.GRABBER && tab.url.startsWith("https://")) {
+            view.options.addView(autoScrollRow(view) {
+                sheet.dismiss()
+                autoScrollPage()
             })
         }
 
@@ -609,6 +659,50 @@ class MainActivity : SecureActivity(),
         return row.root
     }
 
+    private fun autoScrollRow(sheet: SheetMediaBinding, onStart: () -> Unit): View {
+        val row = ItemMediaBinding.inflate(layoutInflater, sheet.options, false)
+        row.icon.text = "⬇️"
+        row.title.setText(R.string.autoscroll_title)
+        row.details.setText(R.string.autoscroll_details)
+        row.download.setText(R.string.autoscroll_start)
+        row.download.setOnClickListener { onStart() }
+        row.root.setOnClickListener { onStart() }
+        return row.root
+    }
+
+    private var scrollJob: Job? = null
+
+    /**
+     * Baja sola por la página abierta (pulsando «Cargar más») mientras el recolector
+     * apunta cada foto y vídeo; al terminar abre la lista con todo lo encontrado.
+     */
+    private fun autoScrollPage() {
+        val tab = tabManager.current ?: return
+        val webView = tab.webView
+        scrollJob?.cancel()
+        webView.evaluateJavascript(AutoScroll.start(maxSteps = 400), null)
+        val bar = Snackbar.make(binding.root, getString(R.string.autoscroll_running, 0), Snackbar.LENGTH_INDEFINITE)
+        bar.setAction(R.string.autoscroll_stop) { webView.evaluateJavascript(AutoScroll.STOP, null) }
+        bar.show()
+        scrollJob = lifecycleScope.launch {
+            while (true) {
+                delay(1000)
+                if (tabManager.current !== tab) {
+                    webView.evaluateJavascript(AutoScroll.STOP, null)
+                    break
+                }
+                val raw = suspendCancellableCoroutine<String?> { cont ->
+                    webView.evaluateJavascript(AutoScroll.STATUS) { if (cont.isActive) cont.resume(it) }
+                }
+                val status = runCatching { JSONObject(JSONTokener(raw).nextValue() as String) }.getOrNull() ?: break
+                bar.setText(getString(R.string.autoscroll_running, status.optInt("found")))
+                if (status.optBoolean("done")) break
+            }
+            bar.dismiss()
+            if (tabManager.current === tab) showMedia()
+        }
+    }
+
     private fun imagesRow(sheet: SheetMediaBinding, count: Int, onOpen: () -> Unit): View {
         val row = ItemMediaBinding.inflate(layoutInflater, sheet.options, false)
         row.icon.text = "🖼️"
@@ -636,8 +730,14 @@ class MainActivity : SecureActivity(),
         val view = SheetImagesBinding.inflate(layoutInflater)
         sheet.setContentView(view.root)
 
-        val items = initial.distinctBy { it.url }.toMutableList()
+        val items = LinkGrabber.dropSmallVariants(initial.distinctBy { it.url }).toMutableList()
+        /** Lo que se ve en la cuadrícula: [items] pasado por el filtro de tipo y de calidad. */
+        val shown = mutableListOf<GrabItem>()
         val selected = linkedSetOf<String>()
+        /** Tamaño real de cada foto, conocido al cargar su miniatura. */
+        val realSize = HashMap<String, Pair<Int, Int>>()
+        var filter = GrabFilter.ALL
+        var bestOnly = true
         val userAgent = tabManager.current?.webView?.settings?.userAgentString ?: WebSettings.getDefaultUserAgent(this)
         val inspector = MediaInspector(this)
         val cache = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
@@ -649,6 +749,23 @@ class MainActivity : SecureActivity(),
         var deepJob: Job? = null
         val details = linkedSetOf<String>().apply { addAll(initialDetails) }
         val grabber = LinkGrabber(this, userAgent)
+        /** Lo que ya está en la carpeta segura (se marca y no entra en «Todas»). */
+        val owned = Vault.get(this).downloadedHashes()
+        val ownedCache = HashMap<String, Boolean>()
+        fun isOwned(item: GrabItem): Boolean = ownedCache.getOrPut(item.url) {
+            Vault.hashUrl(UrlUtils.upgradeToHttps(item.url)) in owned ||
+                item.fallback?.let { Vault.hashUrl(it) in owned } == true
+        }
+
+        fun isLow(item: GrabItem): Boolean {
+            val (w, h) = realSize[item.url] ?: (0 to 0)
+            return LinkGrabber.isLowQuality(item, w, h)
+        }
+
+        fun applyFilter() {
+            shown.clear()
+            items.filterTo(shown) { LinkGrabber.matches(it, filter) && !(bestOnly && isLow(it)) }
+        }
 
         fun addFound(found: List<GrabItem>) {
             // Juntar con lo que ya hay y quitar las versiones pequeñas de la misma foto.
@@ -657,6 +774,7 @@ class MainActivity : SecureActivity(),
             selected.retainAll(kept)
             items.clear()
             items.addAll(merged)
+            applyFilter()
         }
 
         fun updateDeepButton() {
@@ -664,27 +782,58 @@ class MainActivity : SecureActivity(),
             if (deepJob == null) view.deepScan.text = getString(R.string.grab_deep, minOf(details.size, LinkGrabber.MAX_DETAILS))
         }
 
+        fun chosen(): List<GrabItem> = shown.filter { it.url in selected }
+
         fun refresh() {
-            view.title.text = getString(R.string.images_count, items.size)
-            view.download.isEnabled = selected.isNotEmpty()
-            view.download.text = if (selected.isEmpty()) getString(R.string.images_download_none)
-            else getString(R.string.images_download, selected.size)
-            view.selectAll.setText(if (selected.size == items.size && items.isNotEmpty()) R.string.images_select_none else R.string.images_select_all)
+            val hidden = items.size - shown.size
+            view.title.text = if (hidden > 0) getString(R.string.images_count_filtered, shown.size, hidden)
+            else getString(R.string.images_count, shown.size)
+            val count = chosen().size
+            view.download.isEnabled = count > 0
+            view.download.text = if (count == 0) getString(R.string.images_download_none)
+            else getString(R.string.images_download, count)
+            val freshCount = shown.count { !isOwned(it) }
+            view.selectAll.setText(if (count > 0 && count >= freshCount) R.string.images_select_none else R.string.images_select_all)
         }
 
-        val adapter = object : BaseAdapter() {
-            override fun getCount() = items.size
-            override fun getItem(position: Int) = items[position]
+        lateinit var adapter: BaseAdapter
+
+        /** La foto ya se puede ver: se apunta su tamaño real o, si no existe, se usa la de reserva. */
+        fun onPreview(item: GrabItem, preview: MediaInspector.Preview?) {
+            val index = items.indexOfFirst { it.url == item.url }
+            if (preview == null) {
+                val backup = item.fallback ?: return
+                LinkGrabber.markMissing(item.url)
+                if (index >= 0) items[index] = item.copy(url = backup, fallback = null)
+                if (selected.remove(item.url)) selected.add(backup)
+            } else {
+                cache.put(item.url, preview.bitmap)
+                realSize[item.url] = preview.width to preview.height
+                if (index >= 0 && item.width == 0) items[index] = item.copy(width = preview.width, height = preview.height)
+            }
+            applyFilter()
+            adapter.notifyDataSetChanged()
+            refresh()
+        }
+
+        adapter = object : BaseAdapter() {
+            override fun getCount() = shown.size
+            override fun getItem(position: Int) = shown[position]
             override fun getItemId(position: Int) = position.toLong()
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val cell = convertView?.let { ItemImageBinding.bind(it) } ?: ItemImageBinding.inflate(layoutInflater, parent, false)
-                val item = items[position]
+                val item = shown[position]
                 val isImage = item.kind == MediaKind.IMAGE
+                val (rw, rh) = realSize[item.url] ?: (item.width to item.height)
+                val quality = if (item.kind == MediaKind.VIDEO) LinkGrabber.videoQuality(item.url) else 0
                 cell.size.text = when {
-                    item.width > 0 && item.height > 0 -> "${item.width}×${item.height}"
+                    rw > 0 && rh > 0 -> "${rw}×${rh}"
+                    quality > 0 -> "${quality}p"
                     !isImage -> URLUtil.guessFileName(item.url, null, null).take(24)
                     else -> ""
                 }
+                if (isImage && MediaSniffer.extensionOf(item.url) == "gif") cell.size.text = "GIF " + cell.size.text
+                if (isOwned(item)) cell.size.text = getString(R.string.grab_owned) + " " + cell.size.text
                 cell.size.visibility = if (cell.size.text.isEmpty()) View.GONE else View.VISIBLE
                 cell.icon.visibility = if (isImage) View.GONE else View.VISIBLE
                 cell.icon.text = if (item.kind == MediaKind.AUDIO) "🎵" else "🎬"
@@ -695,35 +844,60 @@ class MainActivity : SecureActivity(),
                 cell.image.setImageBitmap(bitmap)
                 if (isImage && bitmap == null && item.url !in loading) {
                     loading[item.url] = lifecycleScope.launch {
-                        val loaded = limit.withPermit { inspector.loadThumbnail(item.url, item.referer, userAgent) }
+                        val loaded = limit.withPermit { inspector.loadPreview(item.url, item.referer, userAgent) }
                         loading.remove(item.url)
-                        if (loaded != null) {
-                            cache.put(item.url, loaded)
-                            notifyDataSetChanged()
-                        }
+                        onPreview(item, loaded)
                     }
                 }
                 return cell.root
             }
         }
+        applyFilter()
         view.grid.adapter = adapter
         view.grid.setOnItemClickListener { _, _, position, _ ->
-            val url = items[position].url
+            val url = shown.getOrNull(position)?.url ?: return@setOnItemClickListener
             if (!selected.remove(url)) selected.add(url)
             adapter.notifyDataSetChanged()
             refresh()
         }
         view.selectAll.setOnClickListener {
-            if (selected.size == items.size) selected.clear() else selected.addAll(items.map { it.url })
+            val visible = shown.map { it.url }
+            val fresh = shown.filterNot { isOwned(it) }.map { it.url }
+            if (chosen().size >= fresh.size && chosen().isNotEmpty()) selected.removeAll(visible.toSet()) else selected.addAll(fresh)
             adapter.notifyDataSetChanged()
             refresh()
         }
+        // Filtros: tipo de archivo y «solo la mejor calidad».
+        view.filters.setOnCheckedStateChangeListener { _, ids ->
+            filter = when (ids.firstOrNull()) {
+                R.id.filterPhotos -> GrabFilter.PHOTOS
+                R.id.filterGifs -> GrabFilter.GIFS
+                R.id.filterVideos -> GrabFilter.VIDEOS
+                else -> GrabFilter.ALL
+            }
+            applyFilter()
+            adapter.notifyDataSetChanged()
+            refresh()
+        }
+        view.bestOnly.setOnCheckedChangeListener { _, checked ->
+            bestOnly = checked
+            applyFilter()
+            adapter.notifyDataSetChanged()
+            refresh()
+        }
+        if (BuildConfig.GRABBER && crawlFrom != null && crawlFrom == tabManager.current?.url) {
+            view.autoScroll.visibility = View.VISIBLE
+            view.autoScroll.setOnClickListener {
+                sheet.dismiss()
+                autoScrollPage()
+            }
+        }
         if (crawlFrom != null) {
             view.morePages.visibility = View.VISIBLE
-            view.morePages.setOnClickListener {
+            fun startCrawl(maxPages: Int, resume: Boolean) {
                 view.morePages.isEnabled = false
                 crawlJob = lifecycleScope.launch {
-                    grabber.crawl(crawlFrom) { number, page ->
+                    grabber.crawl(crawlFrom, maxPages = maxPages, resume = resume) { number, page ->
                         withContext(Dispatchers.Main) {
                             addFound(page.items)
                             details.addAll(page.details)
@@ -735,6 +909,20 @@ class MainActivity : SecureActivity(),
                     }
                     view.morePages.text = getString(R.string.grab_done)
                 }
+            }
+            view.morePages.setOnClickListener {
+                // Elegir hasta dónde llegar y, si ya se empezó antes, seguir donde se quedó.
+                val limits = intArrayOf(10, 30, 100, LinkGrabber.MAX_PAGES)
+                val labels = limits.map { getString(R.string.grab_limit_pages, it) }.toMutableList()
+                val saved = LinkGrabber.savedProgress(crawlFrom)
+                if (saved != null) labels.add(0, getString(R.string.grab_resume, saved))
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.grab_limit_title)
+                    .setItems(labels.toTypedArray()) { _, which ->
+                        if (saved != null && which == 0) startCrawl(LinkGrabber.MAX_PAGES, resume = true)
+                        else startCrawl(limits[if (saved != null) which - 1 else which], resume = false)
+                    }
+                    .showSecure()
             }
         }
         // Análisis a fondo: abre la página de cada miniatura y coge su foto grande.
@@ -756,8 +944,23 @@ class MainActivity : SecureActivity(),
             }
         }
         view.download.setOnClickListener {
-            downloadItems(items.filter { it.url in selected }, pageTitle)
-            sheet.dismiss()
+            val picked = chosen()
+            view.download.isEnabled = false
+            lifecycleScope.launch {
+                // Originales adivinados (Pinterest) que aún no se han comprobado: si no existen, la de reserva.
+                val checked = picked.map { item ->
+                    async {
+                        val backup = item.fallback
+                        if (backup == null || realSize.containsKey(item.url)) item
+                        else limit.withPermit {
+                            if (inspector.exists(item.url, item.referer, userAgent)) item
+                            else item.copy(url = backup, fallback = null).also { LinkGrabber.markMissing(item.url) }
+                        }
+                    }
+                }.awaitAll()
+                downloadItems(checked, pageTitle)
+                sheet.dismiss()
+            }
         }
         refresh()
         sheet.setOnDismissListener {
@@ -766,6 +969,16 @@ class MainActivity : SecureActivity(),
             loading.values.forEach { it.cancel() }
         }
         sheet.show()
+    }
+
+    /** ¿El nombre del archivo en la web dice algo (no es solo un código o «image.jpg»)? */
+    private fun meaningfulName(fileName: String): Boolean {
+        val base = fileName.substringBeforeLast('.').lowercase()
+        if (base.length < 3 || base in GENERIC_NAMES) return false
+        if (Regex("^[0-9a-f_-]{12,}$").matches(base)) return false
+        val digits = base.count { it.isDigit() }
+        if (base.length >= 20 && digits >= 4 && !base.contains(Regex("[a-z]{4,}"))) return false
+        return true
     }
 
     private fun downloadItems(chosen: List<GrabItem>, pageTitle: String) {
@@ -778,13 +991,17 @@ class MainActivity : SecureActivity(),
                 // Galería automática: carpeta de la web y, dentro, una con el nombre de la página.
                 val folder = Vault.galleryFolder(item.referer ?: tab?.url, item.album ?: pageTitle)
                 // Nombre del archivo en la web si lo tiene; si no, el título de la página numerado.
+                // Si el nombre de la web es un código sin sentido (a8f3e9…), se usa el título numerado
+                // en el mismo orden que en la página: «Título 001», «Título 002»…
                 val fromUrl = URLUtil.guessFileName(item.url, null, null)
                     .takeIf { MediaSniffer.kindForExtension(MediaSniffer.extensionOf(item.url)) == item.kind }
+                    ?.takeIf { meaningfulName(it) }
                 val name = fromUrl?.takeIf { used.add(it) }
+                val number = (i + 1).toString().padStart(if (allowed.size >= 1000) 4 else 3, '0')
                 DownloadCenter.enqueue(
                     DownloadRequest(
                         url = UrlUtils.upgradeToHttps(item.url),
-                        title = if (name == null && allowed.size > 1) "$pageTitle ${i + 1}" else pageTitle,
+                        title = if (name == null && allowed.size > 1) "$pageTitle $number" else pageTitle,
                         kind = item.kind,
                         referer = item.referer ?: tab?.url,
                         userAgent = tab?.webView?.settings?.userAgentString ?: "",
@@ -987,3 +1204,9 @@ class MainActivity : SecureActivity(),
         return intent.dataString?.let { UrlUtils.fromUserInput(it) }
     }
 }
+
+/** Tope de imágenes recordadas por pestaña (para no gastar memoria en webs infinitas). */
+private const val MAX_SEEN_IMAGES = 3000
+
+/** Nombres de archivo que no dicen nada: se cambian por el título de la página. */
+private val GENERIC_NAMES = setOf("image", "img", "photo", "foto", "picture", "download", "original", "file", "media", "video", "untitled", "default")
