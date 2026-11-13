@@ -28,6 +28,19 @@ object LoginWall {
         handlers[webView] = WebViewCompat.addDocumentStartJavaScript(webView, SCRIPT, setOf("*"))
     }
 
+    private val WALL_PATH = Regex("""^/(login|signup|register|join)(/|$)""", RegexOption.IGNORE_CASE)
+
+    /**
+     * ¿Es un salto a la página de registro/inicio de sesión que la web hace sola
+     * (sin que hayas tocado nada)? Esos se bloquean; si tocas «Iniciar sesión», sí entra.
+     */
+    fun isForcedWall(request: android.webkit.WebResourceRequest): Boolean {
+        if (!request.isForMainFrame || request.hasGesture()) return false
+        val host = request.url.host?.lowercase() ?: return false
+        if (SITES.none { host.startsWith("$it.") || host.contains(".$it.") }) return false
+        return WALL_PATH.containsMatchIn(request.url.path.orEmpty())
+    }
+
     /** WebViews antiguos sin scripts de inicio: se pone al terminar de cargar. */
     fun applyLate(webView: WebView) {
         if (supportsDocumentStart) return
@@ -54,6 +67,25 @@ object LoginWall {
               return add.call(this, type, fn, opts);
             };
           } catch (e) {}
+
+          // 0b) Si la web intenta llevarte sola a la página de registro o de inicio de
+          //     sesión (sin que hayas tocado ese botón), se queda donde estabas.
+          var WALL_PATH = /^\/(login|signup|register|join)(\/|$)|\/(unauth|signup)[-_]?wall/i;
+          var lastTap = 0;
+          document.addEventListener('click', function(ev) {
+            var t = ev.target && ev.target.closest ? ev.target.closest('a,button') : null;
+            if (t && /(log ?in|sign ?up|iniciar|reg[ií]str|crear cuenta)/i.test(t.innerText || t.getAttribute('aria-label') || '')) lastTap = Date.now();
+          }, true);
+          function isWall(url) {
+            try { return WALL_PATH.test(new URL(url, location.href).pathname) && Date.now() - lastTap > 3000; } catch (e) { return false; }
+          }
+          ['pushState', 'replaceState'].forEach(function(name) {
+            var orig = history[name];
+            history[name] = function(state, title, url) {
+              if (url && isWall(url)) return;
+              return orig.apply(this, arguments);
+            };
+          });
 
           // 1) Ventanas conocidas de Pinterest y el scroll bloqueado.
           var css = [

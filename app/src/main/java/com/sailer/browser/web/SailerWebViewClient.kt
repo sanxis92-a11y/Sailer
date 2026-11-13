@@ -43,6 +43,8 @@ class SailerWebViewClient(
         val url = request.url.toString()
         return when (request.url.scheme?.lowercase()) {
             // Redirecciones a webs de publicidad (pop-unders): bloqueadas.
+            // Pinterest y similares: no dejar que te lleven solos a «Regístrate» sin tocar nada.
+            "https" if LoginWall.isForcedWall(request) -> true
             "https" -> requestFilter.shouldBlockNavigation(request.url, pageHost).also { blocked ->
                 if (blocked) blockedCount.incrementAndGet()
             }
