@@ -218,6 +218,18 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         return null
     }
 
+    /** Envía el formulario de «continuar» de una web de fotos y devuelve la página que sale. */
+    private fun postForm(url: HttpUrl, name: String, value: String): String? = runCatching {
+        val body = okhttp3.FormBody.Builder().add(name, value).build()
+        val request = Request.Builder().url(url).post(body)
+            .header("User-Agent", userAgent)
+            .header("Referer", url.toString())
+            .build()
+        HttpClients.get(context).newCall(request).execute().use { r ->
+            if (r.isSuccessful) r.body?.string()?.take(MAX_HTML) else null
+        }
+    }.getOrNull()
+
     fun readPage(pageUrl: String): GrabPage =
         readPageOrNull(pageUrl, null) ?: GrabPage(emptyList(), emptyList(), null, "")
 
@@ -238,7 +250,11 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
      */
     private fun mainImage(pageUrl: String): GrabItem? {
         val base = pageUrl.toHttpUrlOrNull() ?: return null
-        val html = fetchHtml(base) ?: return null
+        var html = fetchHtml(base) ?: return null
+        // imx.to y parecidas enseñan antes un botón «Continue to your image»: se pulsa.
+        CONTINUE_INPUT.find(html)?.let { m ->
+            postForm(base, m.groupValues[1], decodeEntities(m.groupValues[2]))?.let { html = it }
+        }
         val title = titleOf(html)
         if (isImageHost(pageUrl)) {
             IMG.findAll(html).firstOrNull { HOST_MAIN_IMG.containsMatchIn(it.value) }?.let { img ->
@@ -400,6 +416,12 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
             return IMAGE_HOSTS.any { host == it || host.endsWith(".$it") }
         }
 
+        /** Botón «Continue to your image» (imx.to, imagetwist, vipr…): nombre y valor del campo. */
+        private val CONTINUE_INPUT = Regex(
+            """<input[^>]*name\s*=\s*["'](imgContinue|op|continue)["'][^>]*value\s*=\s*["']([^"']*(?:continue|image)[^"']*)["']""",
+            RegexOption.IGNORE_CASE,
+        )
+
         /** La foto principal en esas webs (id o clase típicos). */
         private val HOST_MAIN_IMG = Regex(
             """\s(?:id|class)\s*=\s*["'][^"']*\b(img|image|main-image|image-img|show_image|pic|mainImage|imageContainer|centred|img-responsive)\b""",
@@ -542,6 +564,33 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         }
 
         /** Convierte una miniatura de Pinterest en su original (con la de 736 px de reserva). */
+        /**
+         * Webs de alojar fotos: la miniatura y la foto grande tienen direcciones
+         * parecidas, así que se pide la grande directamente (la miniatura queda de reserva).
+         */
+        private val HOST_THUMB_RULES = listOf(
+            // imx.to: /u/t/AAAA/MM/DD/x.jpg → /u/i/AAAA/MM/DD/x.jpg
+            Regex("""^https://(?:[a-z0-9]+\.)?imx\.to/u/t/(.+)$""", RegexOption.IGNORE_CASE) to "https://imx.to/u/i/$1",
+            // pixhost: t12.pixhost.to/thumbs/… → img12.pixhost.to/images/…
+            Regex("""^https://t(\d+)\.pixhost\.to/thumbs/(.+)$""", RegexOption.IGNORE_CASE) to "https://img$1.pixhost.to/images/$2",
+            // imagetwist: s10.imagetwist.com/th/… → s10.imagetwist.com/i/…
+            Regex("""^https://([a-z0-9]+)\.imagetwist\.com/th/(.+)$""", RegexOption.IGNORE_CASE) to "https://$1.imagetwist.com/i/$2",
+            // imgbox: thumbs2.imgbox.com/ab/cd/x_t.png → images2.imgbox.com/ab/cd/x_o.png
+            Regex("""^https://thumbs(\d+)\.imgbox\.com/(.+)_t\.(\w+)$""", RegexOption.IGNORE_CASE) to "https://images$1.imgbox.com/$2_o.$3",
+        )
+
+        private fun hostThumbToFull(item: GrabItem): GrabItem {
+            if (item.fallback != null) return item
+            HOST_THUMB_RULES.forEach { (rule, full) ->
+                if (rule.matches(item.url)) {
+                    val big = rule.replace(item.url, full)
+                    if (big in missing) return item
+                    return item.copy(url = big, width = 0, height = 0, fallback = item.url)
+                }
+            }
+            return item
+        }
+
         private fun pinterestBest(item: GrabItem): GrabItem {
             val m = PIN_IMAGE.find(item.url) ?: return item
             if (m.groupValues[1].equals("originals", true)) return item
@@ -582,7 +631,7 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
             val best = linkedMapOf<String, GrabItem>()
             items.forEach { raw ->
                 if (raw.kind == MediaKind.IMAGE && isPinterestAvatar(raw.url)) return@forEach
-                val item = if (raw.kind == MediaKind.IMAGE) pinterestBest(raw) else raw
+                val item = if (raw.kind == MediaKind.IMAGE) hostThumbToFull(pinterestBest(raw)) else raw
                 val key = when (item.kind) {
                     MediaKind.IMAGE -> variantKey(item.url)
                     MediaKind.VIDEO -> videoKey(item.url)
