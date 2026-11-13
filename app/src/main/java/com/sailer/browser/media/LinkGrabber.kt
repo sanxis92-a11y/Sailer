@@ -1,8 +1,10 @@
 package com.sailer.browser.media
 
 import android.content.Context
+import com.sailer.browser.BuildConfig
 import com.sailer.browser.download.HttpClients
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -67,6 +69,7 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
     suspend fun crawl(
         startUrl: String,
         maxPages: Int = MAX_PAGES,
+        useBrowser: Boolean = BuildConfig.GRABBER,
         onPage: suspend (pageNumber: Int, page: GrabPage) -> Unit,
     ) = withContext(Dispatchers.IO) {
         val visited = mutableSetOf<String>()
@@ -77,10 +80,20 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
         var number = 0
         var dry = 0
         var failures = 0
+        var hidden: HiddenReader? = null
+        try {
         while (url != null && number < maxPages && visited.add(url.substringBefore('#'))) {
             coroutineContext.ensureActive()
             val current: String = url
-            val page = readPageOrNull(current, referer)
+            var page = readPageOrNull(current, referer)
+            // Página «vacía» (galería montada con JavaScript) o sin página siguiente (galerías con
+            // «Cargar más» o scroll infinito): se vuelve a leer con el navegador oculto.
+            if (useBrowser && (page == null || page.items.isEmpty() || (page.next == null && Pagination.next(current, page.links, pattern) == null))) {
+                val reader = hidden ?: HiddenReader(context, userAgent).also { hidden = it }
+                val steps = if (page == null || page.items.isEmpty()) 15 else if (maxPages == 1) 25 else 60
+                val rendered = reader.read(current, steps)
+                if (rendered != null) page = merge(page, fromRendered(rendered))
+            }
             if (page == null) {
                 // Página que no se puede leer: si se sabe la numeración, se prueba la siguiente.
                 failures++
@@ -100,6 +113,33 @@ class LinkGrabber(private val context: Context, private val userAgent: String) {
                 ?: pattern?.let { Pagination.guess(current, it)?.url }
             referer = current
         }
+        } finally {
+            withContext(NonCancellable) { hidden?.close() }
+        }
+    }
+
+    /** Lo que sacó el navegador oculto, convertido en una página del recolector. */
+    private fun fromRendered(rendered: HiddenReader.Rendered): GrabPage? {
+        val base = rendered.url.toHttpUrlOrNull() ?: return null
+        val title = rendered.title.ifBlank { titleOf(rendered.html) }
+        val (items, details) = findItems(rendered.html, base, rendered.url, title)
+        val links = ANCHOR.findAll(rendered.html).mapNotNull { m -> resolve(base, attr(m.groupValues[1], "href")) }
+            .filter { it.toHttpUrlOrNull()?.host == base.host }
+            .distinct().take(MAX_LINKS).toList()
+        val all = dropSmallVariants(items + rendered.media.filter { it.kind != MediaKind.IMAGE || !JUNK.containsMatchIn(it.url.substringAfterLast('/')) })
+        return GrabPage(all, details, findNext(rendered.html, base), title, links)
+    }
+
+    private fun merge(a: GrabPage?, b: GrabPage?): GrabPage? = when {
+        a == null -> b
+        b == null -> a
+        else -> GrabPage(
+            dropSmallVariants(a.items + b.items),
+            (a.details + b.details).distinct(),
+            a.next ?: b.next,
+            a.title.ifBlank { b.title },
+            (a.links + b.links).distinct(),
+        )
     }
 
     /**

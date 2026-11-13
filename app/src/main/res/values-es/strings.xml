@@ -47,6 +47,11 @@
     <string name="grab_filter_videos">Vídeos</string>
     <string name="grab_filter_best_only">Solo la mejor calidad (ocultar miniaturas y copias pequeñas)</string>
     <string name="images_count_filtered">%1$d a la vista · %2$d ocultos</string>
+    <string name="autoscroll_title">Bajar sola la página y recogerlo todo</string>
+    <string name="autoscroll_details">Para webs que cargan más al bajar o con botón «Cargar más»: Nauvel baja sola y apunta cada foto y vídeo</string>
+    <string name="autoscroll_start">Empezar</string>
+    <string name="autoscroll_running">Bajando la página… %d archivos vistos</string>
+    <string name="autoscroll_stop">Parar</string>
     <string name="images_view">Ver</string>
     <string name="images_hint">Toca las que quieras guardar</string>
     <string name="images_select_all">Todas</string>

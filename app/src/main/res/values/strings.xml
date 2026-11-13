@@ -48,6 +48,11 @@
     <string name="grab_filter_videos">Videos</string>
     <string name="grab_filter_best_only">Best quality only (hide thumbnails and small copies)</string>
     <string name="images_count_filtered">%1$d shown · %2$d hidden</string>
+    <string name="autoscroll_title">Scroll the whole page and collect everything</string>
+    <string name="autoscroll_details">For endless pages and «Load more» buttons: Nauvel scrolls by itself and notes every photo and video</string>
+    <string name="autoscroll_start">Start</string>
+    <string name="autoscroll_running">Scrolling the page… %d files seen</string>
+    <string name="autoscroll_stop">Stop</string>
     <string name="images_view">View</string>
     <string name="images_hint">Tap the ones you want to save</string>
     <string name="images_select_all">Select all</string>

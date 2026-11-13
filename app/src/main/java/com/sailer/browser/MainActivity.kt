@@ -76,6 +76,11 @@ import com.sailer.browser.vault.Bookmarks
 import com.sailer.browser.vault.BookmarksActivity
 import com.sailer.browser.vault.Vault
 import com.sailer.browser.vault.VaultActivity
+import com.google.android.material.snackbar.Snackbar
+import com.sailer.browser.media.AutoScroll
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -565,6 +570,13 @@ class MainActivity : SecureActivity(),
                 showImagePicker(images, pageTitle, tab.url.takeIf { it.startsWith("https://") }, info.details)
             })
         }
+        // Webs con scroll infinito o «Cargar más»: bajar sola hasta el final y recogerlo todo.
+        if (BuildConfig.GRABBER && tab.url.startsWith("https://")) {
+            view.options.addView(autoScrollRow(view) {
+                sheet.dismiss()
+                autoScrollPage()
+            })
+        }
 
         if (!StorePolicy.allowsDownload(tab.url, tab.url)) {
             view.loading.visibility = View.GONE
@@ -645,6 +657,50 @@ class MainActivity : SecureActivity(),
             onChosen()
         }
         return row.root
+    }
+
+    private fun autoScrollRow(sheet: SheetMediaBinding, onStart: () -> Unit): View {
+        val row = ItemMediaBinding.inflate(layoutInflater, sheet.options, false)
+        row.icon.text = "⬇️"
+        row.title.setText(R.string.autoscroll_title)
+        row.details.setText(R.string.autoscroll_details)
+        row.download.setText(R.string.autoscroll_start)
+        row.download.setOnClickListener { onStart() }
+        row.root.setOnClickListener { onStart() }
+        return row.root
+    }
+
+    private var scrollJob: Job? = null
+
+    /**
+     * Baja sola por la página abierta (pulsando «Cargar más») mientras el recolector
+     * apunta cada foto y vídeo; al terminar abre la lista con todo lo encontrado.
+     */
+    private fun autoScrollPage() {
+        val tab = tabManager.current ?: return
+        val webView = tab.webView
+        scrollJob?.cancel()
+        webView.evaluateJavascript(AutoScroll.start(maxSteps = 400), null)
+        val bar = Snackbar.make(binding.root, getString(R.string.autoscroll_running, 0), Snackbar.LENGTH_INDEFINITE)
+        bar.setAction(R.string.autoscroll_stop) { webView.evaluateJavascript(AutoScroll.STOP, null) }
+        bar.show()
+        scrollJob = lifecycleScope.launch {
+            while (true) {
+                delay(1000)
+                if (tabManager.current !== tab) {
+                    webView.evaluateJavascript(AutoScroll.STOP, null)
+                    break
+                }
+                val raw = suspendCancellableCoroutine<String?> { cont ->
+                    webView.evaluateJavascript(AutoScroll.STATUS) { if (cont.isActive) cont.resume(it) }
+                }
+                val status = runCatching { JSONObject(JSONTokener(raw).nextValue() as String) }.getOrNull() ?: break
+                bar.setText(getString(R.string.autoscroll_running, status.optInt("found")))
+                if (status.optBoolean("done")) break
+            }
+            bar.dismiss()
+            if (tabManager.current === tab) showMedia()
+        }
     }
 
     private fun imagesRow(sheet: SheetMediaBinding, count: Int, onOpen: () -> Unit): View {
@@ -818,6 +874,13 @@ class MainActivity : SecureActivity(),
             applyFilter()
             adapter.notifyDataSetChanged()
             refresh()
+        }
+        if (BuildConfig.GRABBER && crawlFrom != null && crawlFrom == tabManager.current?.url) {
+            view.autoScroll.visibility = View.VISIBLE
+            view.autoScroll.setOnClickListener {
+                sheet.dismiss()
+                autoScrollPage()
+            }
         }
         if (crawlFrom != null) {
             view.morePages.visibility = View.VISIBLE

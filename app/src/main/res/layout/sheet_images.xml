@@ -120,6 +120,15 @@
         android:visibility="gone" />
 
     <Button
+        android:id="@+id/autoScroll"
+        style="@style/SailerTonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/autoscroll_title"
+        android:visibility="gone" />
+
+    <Button
         android:id="@+id/morePages"
         style="@style/SailerTonalButton"
         android:layout_width="match_parent"
