@@ -56,6 +56,7 @@ class BrowserWebViewFactory(
         webView.webViewClient = SailerWebViewClient(requestFilter, callbacks)
         CosmeticFilter.install(webView)
         PageCollector.install(webView)
+        LoginWall.install(webView)
         webView.webChromeClient = chromeClient
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
             downloadHandler.onDownloadRequested(url, userAgent, contentDisposition, mimeType, contentLength)

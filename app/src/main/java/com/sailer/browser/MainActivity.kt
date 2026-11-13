@@ -52,6 +52,7 @@ import com.sailer.browser.media.GrabFilter
 import com.sailer.browser.media.PageImage
 import com.sailer.browser.media.LinkGrabber
 import com.sailer.browser.media.PageCollector
+import com.sailer.browser.web.LoginWall
 import com.sailer.browser.media.PageMediaInfo
 import com.sailer.browser.adblock.AdBlocker
 import com.sailer.browser.databinding.ActivityMainBinding
@@ -357,6 +358,7 @@ class MainActivity : SecureActivity(),
     override fun onPageFinished(view: WebView, url: String) {
         CosmeticFilter.applyLate(view)
         PageCollector.applyLate(view)
+        LoginWall.applyLate(view)
         val tab = tabManager.findByWebView(view) ?: return
         tab.url = url
         if (tab === tabManager.current) showUrl(tab)
