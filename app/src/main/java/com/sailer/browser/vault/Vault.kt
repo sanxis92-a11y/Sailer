@@ -56,7 +56,7 @@ class Vault private constructor(context: Context) {
         val known = entries.map { "${it.id}.bin" }.toSet()
         dir.listFiles()?.forEach { file ->
             if (file.name.endsWith(".bin") && file.name != indexFile.name && file.name !in known) file.delete()
-            if (file.name.endsWith(".mig")) file.delete()
+            if (file.name.endsWith(".mig") || file.name.endsWith(".strip")) file.delete()
         }
         thread(name = "vault-migrate") { migrateLegacyFiles() }
     }
@@ -262,6 +262,33 @@ class Vault private constructor(context: Context) {
         return moved
     }
 
+    /** Archivo cifrado propio de la carpeta segura para guardar datos auxiliares (no puede acabar en .bin). */
+    fun dataFile(name: String): File = File(dir, name)
+
+    /**
+     * Quita a una foto los datos ocultos (ubicación GPS, cámara, XMP...).
+     * Devuelve true si había algo que quitar.
+     */
+    fun stripMetadata(entry: Entry): Boolean {
+        if (entry.kind != MediaKind.IMAGE || entry.size > MAX_STRIP_BYTES) return false
+        val bytes = runCatching { openInput(entry).use { it.readBytes() } }.getOrNull() ?: return false
+        val clean = MetaStrip.strip(bytes) ?: return false
+        val tmp = File(dir, "${entry.id}.strip")
+        try {
+            crypto.encrypt(FileOutputStream(tmp).buffered(256 * 1024)).use { it.write(clean) }
+            synchronized(this) {
+                val index = entries.indexOfFirst { it.id == entry.id }
+                if (index < 0 || !tmp.renameTo(fileOf(entry))) return false
+                entries[index] = entries[index].copy(size = clean.size.toLong())
+                saveIndex()
+            }
+        } finally {
+            tmp.delete()
+        }
+        notifyChanged()
+        return true
+    }
+
     fun delete(entry: Entry) = delete(listOf(entry))
 
     fun delete(list: Collection<Entry>) {
@@ -345,6 +372,8 @@ class Vault private constructor(context: Context) {
     }
 
     companion object {
+        private const val MAX_STRIP_BYTES = 40L * 1024 * 1024
+
         /** «web» o «web/galería» para lo descargado de [pageUrl]. */
         fun galleryFolder(pageUrl: String?, album: String?): String {
             val host = pageUrl?.takeIf { it.startsWith("http") }

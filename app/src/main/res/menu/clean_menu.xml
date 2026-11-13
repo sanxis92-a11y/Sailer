@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_rescan"
+        android:icon="@drawable/ic_refresh"
+        android:title="@string/clean_rescan"
+        app:iconTint="@color/text"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_similarity"
+        android:title="@string/clean_similarity"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_keep"
+        android:title="@string/clean_keep"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_rotations"
+        android:checkable="true"
+        android:title="@string/clean_rotations"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_time_limit"
+        android:checkable="true"
+        android:title="@string/clean_time_limit"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_mark_all"
+        android:title="@string/clean_mark_all"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_unmark_all"
+        android:title="@string/clean_unmark_all"
+        app:showAsAction="never" />
+</menu>

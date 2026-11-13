@@ -34,6 +34,10 @@ jobs:
             echo "Sin clave privada: se firma con la clave de depuración"
           fi
 
+      # Pruebas automáticas (duplicadas, borrosas, metadatos).
+      - name: Pruebas
+        run: ./gradlew testFullDebugUnitTest --no-daemon
+
       # APK completo (para instalar a mano) y paquete AAB para subir a Google Play.
       - name: Compilar APK y AAB
         env:

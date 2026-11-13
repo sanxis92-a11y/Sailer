@@ -47,6 +47,10 @@ class ViewerActivity : SecureActivity() {
             return
         }
         if (entry.kind == MediaKind.IMAGE) showImage(vault, entry) else play(vault, entry)
+        if (entry.kind == MediaKind.IMAGE && com.sailer.browser.BuildConfig.PHOTO_TOOLS) {
+            binding.infoButton.visibility = View.VISIBLE
+            binding.infoButton.setOnClickListener { MetaViewer.show(this, vault, entry) }
+        }
     }
 
     @OptIn(UnstableApi::class)
