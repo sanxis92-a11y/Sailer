@@ -6,21 +6,24 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.awt.image.BufferedImage
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.util.zip.CRC32
-import javax.imageio.ImageIO
 
 class MetaStripTest {
 
-    private fun image(): BufferedImage {
-        val img = BufferedImage(64, 48, BufferedImage.TYPE_INT_RGB)
-        for (y in 0 until 48) for (x in 0 until 64) img.setRGB(x, y, (x * 4 shl 16) or (y * 5 shl 8) or ((x + y) * 2))
-        return img
-    }
+    /** JPEG mínimo (sin metadatos): SOI, APP0 JFIF, tabla falsa, SOS con datos y EOI. */
+    private fun plainJpeg(): ByteArray =
+        byteArrayOf(0xFF.toByte(), 0xD8.toByte()) +
+            segment(0xE0, "JFIF\u0000\u0001\u0001\u0000\u0000\u0001\u0000\u0001\u0000\u0000".toByteArray(Charsets.ISO_8859_1)) +
+            segment(0xDB, ByteArray(65) { it.toByte() }) +
+            segment(0xDA, byteArrayOf(1, 1, 0, 0, 63, 0)) +
+            ByteArray(40) { (it * 7).toByte() } + byteArrayOf(0xFF.toByte(), 0xD9.toByte())
 
-    private fun encode(format: String): ByteArray = ByteArrayOutputStream().also { ImageIO.write(image(), format, it) }.toByteArray()
+    /** PNG mínimo: firma, IHDR, IDAT falso, IEND. */
+    private fun plainPng(): ByteArray =
+        byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) +
+            pngChunk("IHDR", byteArrayOf(0, 0, 0, 4, 0, 0, 0, 4, 8, 2, 0, 0, 0)) +
+            pngChunk("IDAT", ByteArray(20) { it.toByte() }) +
+            pngChunk("IEND", byteArrayOf())
 
     private fun segment(marker: Int, payload: ByteArray): ByteArray {
         val len = payload.size + 2
@@ -43,7 +46,7 @@ class MetaStripTest {
 
     @Test
     fun jpegLosesExifXmpAndCommentButKeepsOrientation() {
-        val plain = encode("jpg")
+        val plain = plainJpeg()
         val xmp = "http://ns.adobe.com/xap/1.0/\u0000<x:xmpmeta><exif:GPSLatitude>41</exif:GPSLatitude></x:xmpmeta>".toByteArray(Charsets.ISO_8859_1)
         val dirty = plain.copyOfRange(0, 2) + segment(0xE1, exif()) + segment(0xE1, xmp) +
             segment(0xFE, "secreto".toByteArray()) + plain.copyOfRange(2, plain.size)
@@ -56,18 +59,18 @@ class MetaStripTest {
         assertTrue(contains(clean, "Exif"))
         val start = String(clean, Charsets.ISO_8859_1).indexOf("Exif") + 6
         assertEquals(6, MetaStrip.exifOrientation(clean, start, clean.size - start))
-        assertNotNull(ImageIO.read(ByteArrayInputStream(clean)))
+        assertTrue(clean.copyOfRange(clean.size - 2, clean.size).contentEquals(byteArrayOf(0xFF.toByte(), 0xD9.toByte())))
         assertEquals(plain.size + MetaStrip.minimalExif(6).size, clean.size)
     }
 
     @Test
     fun jpegWithoutMetadataIsLeftAlone() {
-        assertNull(MetaStrip.strip(encode("jpg")))
+        assertNull(MetaStrip.strip(plainJpeg()))
     }
 
     @Test
     fun motionPhotoXmpIsKept() {
-        val plain = encode("jpg")
+        val plain = plainJpeg()
         val xmp = "http://ns.adobe.com/xap/1.0/\u0000<GCamera:MotionPhoto>1</GCamera:MotionPhoto><Container:Directory/>".toByteArray(Charsets.ISO_8859_1)
         val dirty = plain.copyOfRange(0, 2) + segment(0xE1, exif()) + segment(0xE1, xmp) + plain.copyOfRange(2, plain.size)
         val clean = MetaStrip.strip(dirty)!!
@@ -85,11 +88,10 @@ class MetaStripTest {
 
     @Test
     fun pngLosesTextChunks() {
-        val plain = encode("png")
+        val plain = plainPng()
         val dirty = plain.copyOfRange(0, 33) + pngChunk("tEXt", "Author\u0000Josep".toByteArray(Charsets.ISO_8859_1)) +
             pngChunk("iTXt", "XML:com.adobe.xmp\u0000\u0000\u0000\u0000\u0000<x/>".toByteArray(Charsets.ISO_8859_1)) +
             plain.copyOfRange(33, plain.size)
-        assertNotNull(ImageIO.read(ByteArrayInputStream(dirty)))
         val clean = MetaStrip.strip(dirty)!!
         assertTrue(clean.contentEquals(plain))
     }

@@ -3,55 +3,67 @@ package com.sailer.browser.vault
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.awt.Color
-import java.awt.RenderingHints
-import java.awt.image.BufferedImage
 import kotlin.random.Random
 
 class PhotoMatchTest {
 
-    /** Una «foto» con formas al azar. */
-    private fun photo(seed: Int, w: Int = 400, h: Int = 300): BufferedImage {
+    /** Imagen en gris hecha a mano (las pruebas no tienen java.awt en Android). */
+    private class Gray(val w: Int, val h: Int, val px: IntArray = IntArray(w * h))
+
+    /** Una «foto» con elipses al azar. */
+    private fun photo(seed: Int, w: Int = 400, h: Int = 300): Gray {
         val r = Random(seed)
-        val img = BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
-        val g = img.createGraphics()
-        g.color = Color(r.nextInt(256), r.nextInt(256), r.nextInt(256))
-        g.fillRect(0, 0, w, h)
+        val g = Gray(w, h)
+        g.px.fill(r.nextInt(256))
         repeat(25) {
-            g.color = Color(r.nextInt(256), r.nextInt(256), r.nextInt(256))
-            g.fillOval(r.nextInt(w), r.nextInt(h), 20 + r.nextInt(w / 2), 20 + r.nextInt(h / 2))
+            val cx = r.nextInt(w)
+            val cy = r.nextInt(h)
+            val rx = 10 + r.nextInt(w / 4)
+            val ry = 10 + r.nextInt(h / 4)
+            val v = r.nextInt(256)
+            for (y in maxOf(0, cy - ry) until minOf(h, cy + ry)) for (x in maxOf(0, cx - rx) until minOf(w, cx + rx)) {
+                val dx = (x - cx).toDouble() / rx
+                val dy = (y - cy).toDouble() / ry
+                if (dx * dx + dy * dy <= 1) g.px[y * w + x] = v
+            }
         }
-        g.dispose()
-        return img
+        return g
     }
 
-    private fun scaled(src: BufferedImage, w: Int, h: Int, dx: Int = 0): BufferedImage {
-        val img = BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
-        val g = img.createGraphics()
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-        g.drawImage(src, dx, 0, w, h, null)
-        g.dispose()
-        return img
+    /** Cambia el tamaño (vecino más cercano) y desplaza [dx] píxeles a la derecha. */
+    private fun scaled(src: Gray, w: Int, h: Int, dx: Int = 0): Gray {
+        val g = Gray(w, h)
+        for (y in 0 until h) for (x in 0 until w) {
+            val sx = ((x - dx) * src.w / w).coerceIn(0, src.w - 1)
+            g.px[y * w + x] = src.px[(y * src.h / h) * src.w + sx]
+        }
+        return g
     }
 
-    private fun blur(src: BufferedImage, radius: Int): BufferedImage {
-        val k = 2 * radius + 1
-        val op = java.awt.image.ConvolveOp(java.awt.image.Kernel(k, k, FloatArray(k * k) { 1f / (k * k) }), java.awt.image.ConvolveOp.EDGE_NO_OP, null)
-        return op.filter(src, null)
+    private fun blur(src: Gray, radius: Int): Gray {
+        val g = Gray(src.w, src.h)
+        for (y in 0 until src.h) for (x in 0 until src.w) {
+            var s = 0
+            var n = 0
+            for (yy in maxOf(0, y - radius)..minOf(src.h - 1, y + radius)) for (xx in maxOf(0, x - radius)..minOf(src.w - 1, x + radius)) {
+                s += src.px[yy * src.w + xx]; n++
+            }
+            g.px[y * src.w + x] = s / n
+        }
+        return g
     }
 
-    private fun rotate90(src: BufferedImage): BufferedImage {
-        val img = BufferedImage(src.height, src.width, BufferedImage.TYPE_INT_RGB)
-        for (y in 0 until src.height) for (x in 0 until src.width) img.setRGB(src.height - 1 - y, x, src.getRGB(x, y))
-        return img
+    private fun rotate90(src: Gray): Gray {
+        val g = Gray(src.h, src.w)
+        for (y in 0 until src.h) for (x in 0 until src.w) g.px[x * src.h + (src.h - 1 - y)] = src.px[y * src.w + x]
+        return g
     }
 
     private var created = 1_000_000L
 
-    private fun info(id: String, img: BufferedImage, bytes: Long = 1000): PhotoMatch.Info {
-        val gray = IntArray(img.width * img.height) { PhotoMatch.luma(img.getRGB(it % img.width, it / img.width)) }
+    private fun info(id: String, img: Gray, bytes: Long = 1000): PhotoMatch.Info {
         created += 1000
-        return PhotoMatch.Info(id, img.width, img.height, bytes, created, PhotoMatch.sharpness(gray, img.width, img.height), PhotoMatch.gridOf(gray, img.width, img.height))
+        return PhotoMatch.Info(id, img.w, img.h, bytes, created, PhotoMatch.sharpness(img.px, img.w, img.h), PhotoMatch.gridOf(img.px, img.w, img.h))
     }
 
     @Test
@@ -84,9 +96,7 @@ class PhotoMatchTest {
         val a = photo(5)
         val moved = scaled(a, 400, 300, dx = 14)
         val infos = listOf(info("a", a), info("b", moved), info("c", photo(6)), info("d", photo(7)), info("e", photo(8)))
-        val d = PhotoMatch.distance(infos[0].hash, infos[1].hash)
-        println("distancia escena movida: $d, correlación ${PhotoMatch.correlation(infos[0].grid, infos[1].grid)}")
-        for (i in 2 until 5) println("distancia distinta: ${PhotoMatch.distance(infos[0].hash, infos[i].hash)} corr ${PhotoMatch.correlation(infos[0].grid, infos[i].grid)}")
+        println("escena movida: distancia ${PhotoMatch.distance(infos[0].hash, infos[1].hash)}, correlación ${PhotoMatch.correlation(infos[0].grid, infos[1].grid)}")
         val scenes = PhotoMatch.sameScene(infos, PhotoMatch.Options(), PhotoMatch.Keep.QUALITY, emptySet())
         assertEquals(1, scenes.size)
         assertEquals(setOf("a", "b"), scenes[0].items.map { it.id }.toSet())
