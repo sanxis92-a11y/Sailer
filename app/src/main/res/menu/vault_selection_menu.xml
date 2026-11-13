@@ -18,6 +18,16 @@
         android:title="@string/vault_cut"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_meta"
+        android:title="@string/meta_title"
+        android:visible="false"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_strip_meta"
+        android:title="@string/strip_meta_action"
+        android:visible="false"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_details"
         android:title="@string/vault_details"
         app:showAsAction="never" />

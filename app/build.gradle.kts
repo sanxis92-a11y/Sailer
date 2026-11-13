@@ -11,8 +11,8 @@ android {
         applicationId = "com.nauvel.browser"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.4.0"
+        versionCode = 7
+        versionName = "1.5.0"
     }
 
     // Dos versiones de la app:
@@ -29,6 +29,8 @@ android {
             buildConfigField("boolean", "DISGUISE", "true")
             // Lista de imágenes, galerías de varias páginas y recolector de enlaces (solo uso personal).
             buildConfigField("boolean", "GRABBER", "true")
+            // Limpiar fotos (duplicadas, misma escena, borrosas) y quitar metadatos (solo uso personal).
+            buildConfigField("boolean", "PHOTO_TOOLS", "true")
         }
         create("play") {
             dimension = "store"
@@ -38,6 +40,7 @@ android {
             // y quitar el icono .LauncherCalculator en src/play/AndroidManifest.xml.
             buildConfigField("boolean", "DISGUISE", "true")
             buildConfigField("boolean", "GRABBER", "false")
+            buildConfigField("boolean", "PHOTO_TOOLS", "false")
         }
     }
 
@@ -110,4 +113,5 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
+    testImplementation("junit:junit:4.13.2")
 }

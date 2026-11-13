@@ -166,6 +166,9 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             toolbar.setNavigationIcon(R.drawable.ic_close)
             val single = selectedFiles.size + selectedFolders.size == 1
             toolbar.menu.findItem(R.id.action_rename).isVisible = single
+            toolbar.menu.findItem(R.id.action_strip_meta)?.isVisible = com.sailer.browser.BuildConfig.PHOTO_TOOLS
+            toolbar.menu.findItem(R.id.action_meta)?.isVisible = com.sailer.browser.BuildConfig.PHOTO_TOOLS && single &&
+                selectedFolders.isEmpty() && selectedFiles.firstOrNull()?.let { vault.find(it) }?.kind == MediaKind.IMAGE
         } else {
             toolbar.inflateMenu(R.menu.vault_menu)
             val cut = cutFiles.size + cutFolders.size
@@ -174,6 +177,7 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
             toolbar.title = if (folder.isEmpty()) getString(R.string.menu_vault) else Vault.nameOf(folder)
             toolbar.subtitle = if (folder.isEmpty()) getString(R.string.vault_subtitle) else "/" + folder
             toolbar.setNavigationIcon(R.drawable.ic_back)
+            toolbar.menu.findItem(R.id.action_clean_photos)?.isVisible = com.sailer.browser.BuildConfig.PHOTO_TOOLS
             setUpSearch(toolbar.menu.findItem(R.id.action_search))
         }
         toolbar.navigationIcon?.setTint(ContextCompat.getColor(this, R.color.text))
@@ -192,6 +196,10 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 R.id.action_cancel_paste -> { cutFiles.clear(); cutFolders.clear(); updateToolbar() }
                 R.id.action_details -> showDetails(selectedRows())
                 R.id.action_filter -> chooseFilter()
+                R.id.action_clean_photos ->
+                    startActivity(Intent(this, CleanActivity::class.java).putExtra(CleanActivity.EXTRA_FOLDER, folder))
+                R.id.action_strip_meta -> confirmStrip()
+                R.id.action_meta -> selectedFiles.firstOrNull()?.let { vault.find(it) }?.let { MetaViewer.show(this, vault, it) }
                 R.id.action_organize -> {
                     val moved = vault.organize(folder)
                     toast(if (moved > 0) getString(R.string.vault_organize_done, moved) else getString(R.string.vault_organize_none))
@@ -340,6 +348,36 @@ class VaultActivity : SecureActivity(), Vault.Listener, DownloadCenter.Listener 
                 }
             }
             .showSecure()
+    }
+
+    /** Solo si el usuario lo pide expresamente: por defecto los metadatos se conservan. */
+    private fun confirmStrip() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.strip_meta_action)
+            .setMessage(R.string.strip_meta_confirm)
+            .setPositiveButton(R.string.strip_meta_yes) { _, _ -> stripSelected() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .showSecure()
+    }
+
+    /** Quita los datos ocultos (GPS, cámara, XMP) de las fotos elegidas. */
+    private fun stripSelected() {
+        val rows = selectedRows()
+        val photos = rows.filterIsInstance<Row.File>().map { it.entry }.toMutableList()
+        rows.filterIsInstance<Row.Folder>().forEach { f -> photos += vault.list().filter { Vault.isInside(it.folder, f.path) } }
+        val images = photos.filter { it.kind == MediaKind.IMAGE }.distinctBy { it.id }
+        if (images.isEmpty()) {
+            toast(getString(R.string.strip_meta_none))
+            return
+        }
+        toast(getString(R.string.strip_meta_working, images.size))
+        thread {
+            val cleaned = images.count { runCatching { vault.stripMetadata(it) }.getOrDefault(false) }
+            runOnUiThread {
+                toast(getString(R.string.strip_meta_done, cleaned, images.size))
+                clearSelection()
+            }
+        }
     }
 
     private fun chooseSort() {

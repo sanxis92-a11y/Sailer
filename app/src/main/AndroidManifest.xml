@@ -91,6 +91,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".vault.CleanActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".vault.ViewerActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="false"
