@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.text.format.Formatter
 import android.view.WindowManager
+import android.webkit.CookieManager
 import android.webkit.URLUtil
 import android.webkit.WebSettings
 import android.widget.EditText
@@ -63,6 +64,7 @@ import com.sailer.browser.media.DetectedMedia
 import com.sailer.browser.media.MediaKind
 import com.sailer.browser.media.MediaSniffer
 import com.sailer.browser.privacy.PrivacyManager
+import com.sailer.browser.privacy.SessionKeeper
 import com.sailer.browser.settings.Prefs
 import com.sailer.browser.settings.SettingsActivity
 import com.sailer.browser.tabs.Tab
@@ -235,6 +237,10 @@ class MainActivity : SecureActivity(),
             val client = tabManager.current?.webView?.webViewClient as? SailerWebViewClient
             val siteItem = menu.findItem(R.id.action_adblock_site)
             menu.findItem(R.id.action_grab_links).isVisible = BuildConfig.GRABBER
+            menu.findItem(R.id.action_keep_session).apply {
+                isVisible = client?.pageHost != null
+                setTitle(if (SessionKeeper.isKept(client?.pageHost)) R.string.keep_session_on else R.string.keep_session_off)
+            }
             siteItem.isVisible = AdBlocker.enabled && client?.pageHost != null
             siteItem.title = if (AdBlocker.isAllowedSite(client?.pageHost)) {
                 getString(R.string.adblock_site_on)
@@ -249,6 +255,7 @@ class MainActivity : SecureActivity(),
                     R.id.action_forward -> tabManager.current?.webView?.goForward()
                     R.id.action_tabs -> showTabs()
                     R.id.action_adblock_site -> toggleAdBlockForSite()
+                    R.id.action_keep_session -> toggleKeepSession()
                     R.id.action_media -> showMedia()
                     R.id.action_grab_links -> showLinkCollector()
                     R.id.action_add_bookmark -> addBookmark()
@@ -295,6 +302,19 @@ class MainActivity : SecureActivity(),
         webView.reload()
     }
 
+    private fun toggleKeepSession() {
+        val webView = tabManager.current?.webView ?: return
+        val host = (webView.webViewClient as? SailerWebViewClient)?.pageHost ?: return
+        val keep = !SessionKeeper.isKept(host)
+        SessionKeeper.setKept(this, host, keep)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, keep)
+        Toast.makeText(
+            this,
+            getString(if (keep) R.string.keep_session_added else R.string.keep_session_removed, SessionKeeper.siteKey(host)),
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+
     private fun closeCurrentTab() {
         val tab = tabManager.current ?: return
         if (tabManager.tabs.size == 1) {
@@ -307,6 +327,7 @@ class MainActivity : SecureActivity(),
 
     private fun wipeAndExit() {
         Toast.makeText(this, R.string.wiped, Toast.LENGTH_SHORT).show()
+        SessionKeeper.forgetAll(this) // «Borrar todo» también cierra las sesiones guardadas
         finishAndRemoveTask() // onDestroy se encarga de borrarlo todo
     }
 
@@ -351,6 +372,8 @@ class MainActivity : SecureActivity(),
             tab.seenImages.clear()
         }
         tab.url = url
+        // Cookies de terceros solo en las webs donde quieres mantener la sesión.
+        CookieManager.getInstance().setAcceptThirdPartyCookies(view, SessionKeeper.isKept(Uri.parse(url).host))
         if (tab === tabManager.current) updateMediaButton()
         if (tab === tabManager.current) showUrl(tab)
     }
@@ -359,6 +382,11 @@ class MainActivity : SecureActivity(),
         CosmeticFilter.applyLate(view)
         PageCollector.applyLate(view)
         LoginWall.applyLate(view)
+        val host = Uri.parse(url).host
+        if (SessionKeeper.isKept(host)) {
+            SessionKeeper.noteVisit(this, host)
+            SessionKeeper.save(this)
+        }
         val tab = tabManager.findByWebView(view) ?: return
         tab.url = url
         if (tab === tabManager.current) showUrl(tab)

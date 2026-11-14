@@ -12,6 +12,9 @@ import java.io.File
  * a una sesión. Hay dos momentos de limpieza:
  *  - [wipeSession]: al cerrar el navegador, con los WebView aún vivos.
  *  - [wipeDiskLeftovers]: al arrancar, por si la sesión anterior no terminó bien.
+ *
+ * Excepción: las webs marcadas con «Mantener sesión iniciada» ([SessionKeeper])
+ * recuperan sus cookies (guardadas cifradas) después de cada limpieza.
  */
 object PrivacyManager {
 
@@ -22,9 +25,12 @@ object PrivacyManager {
             webView.clearFormData()
             webView.clearCache(true)
         }
+        SessionKeeper.save(context)
         CookieManager.getInstance().apply {
-            removeAllCookies(null)
-            flush()
+            removeAllCookies {
+                SessionKeeper.restore(context)
+                flush()
+            }
         }
         WebStorage.getInstance().deleteAllData()
         WebViewDatabase.getInstance(context).clearHttpAuthUsernamePassword()

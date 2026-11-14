@@ -298,4 +298,12 @@
     <string name="meta_comment">Comment</string>
     <string name="meta_owner">Camera owner</string>
     <string name="meta_serial">Serial number</string>
+    <string name="keep_session_off">Stay signed in on this site</string>
+    <string name="keep_session_on">Stop staying signed in on this site</string>
+    <string name="keep_session_added">You will stay signed in on %s. Sign in again once so it gets saved.</string>
+    <string name="keep_session_removed">%s will be erased again when you close the browser.</string>
+    <string name="settings_kept_sessions">Sites where you stay signed in</string>
+    <string name="settings_kept_sessions_help">On these sites the browser keeps your login (cookies saved encrypted) and allows third-party cookies. Everything else is still erased. «Erase everything and exit» also signs you out of them.</string>
+    <string name="kept_sessions_empty">No sites yet. Open a site and choose «Stay signed in on this site» in the menu.</string>
+    <string name="kept_sessions_remove">Tap a site to stop keeping its login.</string>
 </resources>

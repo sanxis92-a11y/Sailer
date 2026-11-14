@@ -297,4 +297,12 @@
     <string name="meta_comment">Comentario</string>
     <string name="meta_owner">Dueño de la cámara</string>
     <string name="meta_serial">Número de serie</string>
+    <string name="keep_session_off">Mantener sesión iniciada en esta web</string>
+    <string name="keep_session_on">Dejar de mantener la sesión en esta web</string>
+    <string name="keep_session_added">Se mantendrá tu sesión en %s. Inicia sesión otra vez para que se guarde.</string>
+    <string name="keep_session_removed">%s se volverá a borrar al cerrar el navegador.</string>
+    <string name="settings_kept_sessions">Webs con la sesión guardada</string>
+    <string name="settings_kept_sessions_help">En estas webs el navegador guarda tu inicio de sesión (cookies cifradas) y permite las cookies de terceros. Todo lo demás se sigue borrando. «Borrar todo y salir» también cierra estas sesiones.</string>
+    <string name="kept_sessions_empty">Todavía no hay ninguna. Abre una web y elige «Mantener sesión iniciada en esta web» en el menú.</string>
+    <string name="kept_sessions_remove">Toca una web para dejar de guardar su sesión.</string>
 </resources>

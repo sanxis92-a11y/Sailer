@@ -48,6 +48,17 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:text="@string/settings_private_dns" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keptSessions"
+                    style="@style/SailerTonalButton"
+                    app:icon="@drawable/ic_lock"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/settings_kept_sessions" />
+
+                <TextView style="@style/SailerHint" android:text="@string/settings_kept_sessions_help" />
             </LinearLayout>
 
             <TextView style="@style/SailerSectionTitle" android:text="@string/settings_section_lock" />
