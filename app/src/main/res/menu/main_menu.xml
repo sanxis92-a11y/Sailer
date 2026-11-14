@@ -6,6 +6,7 @@
     <item android:id="@+id/action_forward" android:icon="@drawable/ic_forward" android:iconTint="@color/text_dim" android:title="@string/menu_forward" />
     <item android:id="@+id/action_tabs" android:icon="@drawable/ic_tabs" android:iconTint="@color/text_dim" android:title="@string/menu_tabs" />
     <item android:id="@+id/action_adblock_site" android:icon="@drawable/ic_shield" android:iconTint="@color/text_dim" android:title="@string/adblock_site_on" />
+    <item android:id="@+id/action_keep_session" android:icon="@drawable/ic_lock" android:iconTint="@color/text_dim" android:title="@string/keep_session_off" />
     <item android:id="@+id/action_media" android:icon="@drawable/ic_download" android:iconTint="@color/text_dim" android:title="@string/menu_media" />
     <item android:id="@+id/action_grab_links" android:icon="@drawable/ic_download" android:iconTint="@color/text_dim" android:title="@string/menu_grab_links" />
     <item android:id="@+id/action_add_bookmark" android:icon="@drawable/ic_star" android:iconTint="@color/text_dim" android:title="@string/menu_add_bookmark" />

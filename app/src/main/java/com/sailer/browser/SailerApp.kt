@@ -11,6 +11,7 @@ import com.sailer.browser.dns.WebDns
 import com.sailer.browser.download.DownloadCenter
 import com.sailer.browser.lock.AppLock
 import com.sailer.browser.privacy.PrivacyManager
+import com.sailer.browser.privacy.SessionKeeper
 import com.sailer.browser.settings.Prefs
 import com.sailer.browser.vault.Thumbnails
 
@@ -22,6 +23,9 @@ class SailerApp : Application() {
         // Si la app se cerró de golpe la última vez (o Android la mató),
         // borramos aquí cualquier resto antes de que se cree ningún WebView.
         PrivacyManager.wipeDiskLeftovers(this)
+        // Webs con «Mantener sesión iniciada»: volver a poner sus cookies guardadas.
+        SessionKeeper.load(this)
+        SessionKeeper.restore(this)
 
         AdBlocker.enabled = Prefs.get(this).adBlockEnabled
         AdBlocker.load(this)
@@ -35,6 +39,8 @@ class SailerApp : Application() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
                 AppLock.onAppBackground(this@SailerApp)
+                // Por si Android cierra la app en segundo plano sin avisar.
+                SessionKeeper.save(this@SailerApp)
                 // Las miniaturas descifradas no se quedan en memoria con la app en segundo plano.
                 Thumbnails.clear()
             }

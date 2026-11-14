@@ -22,6 +22,7 @@ import com.sailer.browser.dns.WebDns
 import com.sailer.browser.lock.AppLock
 import com.sailer.browser.lock.LockActivity
 import com.sailer.browser.lock.SecureActivity
+import com.sailer.browser.privacy.SessionKeeper
 import com.sailer.browser.vault.Backup
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -105,6 +106,7 @@ class SettingsActivity : SecureActivity() {
 
         binding.changePin.setOnClickListener { askNewPin(onCancel = {}) {} }
         binding.privateDns.setOnClickListener { explainPrivateDns() }
+        binding.keptSessions.setOnClickListener { showKeptSessions() }
         binding.backupExport.setOnClickListener {
             AppLock.skipLockBriefly()
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
@@ -187,6 +189,20 @@ class SettingsActivity : SecureActivity() {
         setHint(hint)
         inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
         imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+    }
+
+    private fun showKeptSessions() {
+        val sites = SessionKeeper.keptSites.sorted()
+        val builder = MaterialAlertDialogBuilder(this).setTitle(R.string.settings_kept_sessions)
+        if (sites.isEmpty()) {
+            builder.setMessage(R.string.kept_sessions_empty)
+        } else {
+            builder.setItems(sites.toTypedArray()) { _, which ->
+                SessionKeeper.setKept(this, sites[which], false)
+                Toast.makeText(this, getString(R.string.keep_session_removed, sites[which]), Toast.LENGTH_SHORT).show()
+            }
+        }
+        builder.setPositiveButton(R.string.close, null).showSecure()
     }
 
     private fun explainPrivateDns() {
